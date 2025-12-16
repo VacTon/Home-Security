@@ -1,0 +1,23 @@
+# Config for Raspberry Pi 5 + Hailo Face Recognition
+
+system:
+  confidence_threshold: 0.5
+  recognition_tolerance: 0.6  # Lower is stricter
+  frame_width: 640
+  frame_height: 480
+
+email:
+  enabled: true
+  sender_email: "your_email@gmail.com"
+  sender_password: "your_app_password"
+  receiver_emails:
+    - "owner1@example.com"
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  cooldown_seconds: 300  # 5 minutes between emails for the same person
+
+paths:
+  # Path to the compiled HEF model
+  model_path: "models/yolov8n.hef"
+  # Directory containing subfolders of known faces
+  faces_dir: "faces"
