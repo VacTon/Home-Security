@@ -48,36 +48,30 @@ def main():
                 time.sleep(0.1)
                 continue
 
-            # 1. Detect Faces (using YOLO)
+            # 1. Detect Faces (YOLO)
             detections = detector.detect(frame)
 
             # 2. Process Detections
             for det in detections:
                 box = det["box"] # [x1, y1, x2, y2]
                 x1, y1, x2, y2 = box
+                kpts = det.get("keypoints")
 
                 # Draw bounding box
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-                # Extract Face ROI
-                # Ensure coordinates are within frame
-                h, w, _ = frame.shape
-                x1, y1 = max(0, x1), max(0, y1)
-                x2, y2 = min(w, x2), min(h, y2)
                 
-                face_img = frame[y1:y2, x1:x2]
-                
-                if face_img.size == 0:
-                    continue
-                
-                # Convert BGR to RGB for face_recognition
-                face_img_rgb = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+                # Draw Keypoints if available
+                if kpts is not None:
+                     for kp in kpts:
+                         cv2.circle(frame, (int(kp[0]), int(kp[1])), 2, (0, 255, 255), -1)
 
                 # 3. Recognize Face
-                name = recognizer.identify(face_img_rgb)
+                # Pass full frame + info for alignment
+                name, conf = recognizer.identify(frame, kpts=kpts, box=box)
                 
                 # Draw Name
-                cv2.putText(frame, f"{name} ({det['conf']:.2f})", (x1, y1 - 10), 
+                label = f"{name} ({conf:.2f})"
+                cv2.putText(frame, label, (x1, y1 - 10), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                 # 4. Notify

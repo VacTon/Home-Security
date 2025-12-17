@@ -1,8 +1,9 @@
-opencv-python
-PyYAML
-face-recognition
-ultralytics
+opencv-python-headless
 numpy
-# Note: hailo_platform is required for the Hailo accelerator.
-# It is typically installed via the Hailo software suite or a specific .whl file provided by Hailo,
-# so it is not listed here as a standard PyPI package.
+pyyaml
+onnxruntime; platform_system!="Linux" or platform_machine!="aarch64"
+# For Pi 5 (aarch64), usually 'onnxruntime' pip package work if using standard linux, 
+# but simply 'onnxruntime' is fine.
+requests
+scipy
+ultralytics

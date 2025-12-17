@@ -1,8 +1,8 @@
-# Config for Raspberry Pi 5 + Hailo Face Recognition
+# Config for Raspberry Pi 5 Security System (ONNX Version)
 
 system:
   confidence_threshold: 0.5
-  recognition_tolerance: 0.6  # Lower is stricter
+  recognition_tolerance: 0.4  # Cosine Similarity threshold (Higher is stricter, e.g. 0.3-0.5)
   frame_width: 640
   frame_height: 480
 
@@ -14,10 +14,14 @@ email:
     - "owner1@example.com"
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
-  cooldown_seconds: 300  # 5 minutes between emails for the same person
+  cooldown_seconds: 300
 
 paths:
-  # Path to the compiled HEF model
-  model_path: "models/yolov8n.hef"
-  # Directory containing subfolders of known faces
+  # Detector Model (YOLOv8-Face ONNX or PT)
+  model_path: "models/yolov8n-face.onnx"
+  
+  # Recognition Model (ArcFace ONNX)
+  recognition_model_path: "models/w600k_r50.onnx"
+  
+  # Directory containing subfolders of known faces (CROPPED images recommended)
   faces_dir: "faces"
