@@ -14,35 +14,26 @@ class Recognizer:
         self.known_encodings = []
         self.known_names = []
         
-        # 0. Initialize placeholders to avoid AttributeErrors on failure
+        # 0. Initialize placeholders
         self.vdevice = None
-        self.network_group = None
-        self.output_vstream_infos = []
+        self.infer_model = None
         
-        # 1. Initialize Hailo Device
-        logging.info(f"Initializing Hailo Device for Recognition: {self.model_path}")
+        # 1. Initialize Hailo Device (Modern High-Level API)
+        logging.info(f"Initializing Hailo Recognition (High-Level API): {self.model_path}")
         try:
             self.vdevice = VDevice()
-            self.hef = HEF(self.model_path)
+            self.infer_model = self.vdevice.create_infer_model(self.model_path)
             
-            # Use the newer API method to create configure params
-            self.configure_params = self.hef.create_configure_params()
-            self.network_group = self.vdevice.configure(self.hef, self.configure_params)[0]
+            # Identify input/output names
+            self.input_name = self.infer_model.input().name
+            self.output_name = self.infer_model.output().name
             
-            # Get stream info
-            self.input_vstream_infos = self.hef.get_input_vstream_infos()
-            self.output_vstream_infos = self.hef.get_output_vstream_infos()
-            
-            self.input_name = self.input_vstream_infos[0].name
-            self.output_name = self.output_vstream_infos[0].name
-            
-            # Input shape (H, W, C)
-            self.input_shape = self.input_vstream_infos[0].shape
-            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}, Output: {self.output_name}")
+            # Set input shape (H, W, C)
+            self.input_shape = self.infer_model.input().shape
+            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}")
             
         except Exception as e:
             logging.error(f"Failed to initialize Hailo Recognition: {e}")
-            # Keep self.vdevice as None to trigger fallback if any
 
         # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
@@ -75,25 +66,24 @@ class Recognizer:
         return face_img.astype(np.uint8)
 
     def get_embedding(self, img, kpts=None, box=None):
-        if self.vdevice is None:
+        if self.infer_model is None:
             return None
         
         face_blob = self.preprocess(img, kpts, box)
         if face_blob is None:
             return None
             
-        # 3. Hailo Inference
+        # 3. Hailo Inference (High-Level API)
         input_data = {self.input_name: np.expand_dims(face_blob, axis=0)}
         
-        # Use simple inference pipeline
-        input_params = InputVStreamParams.make_from_network_group(self.network_group, quantized=False)
-        output_params = OutputVStreamParams.make_from_network_group(self.network_group, quantized=False)
-        
-        with InferVStreams(self.network_group, input_params, output_params) as infer_pipeline:
-            # Activate and run
-            with self.network_group.activate_config(self.configure_params):
-                results = infer_pipeline.infer(input_data)
-                emb = results[self.output_name][0] # Get first batch
+        with self.infer_model.configure() as configured_model:
+            with configured_model.run() as run_model:
+                results = run_model.infer(input_data)
+                # results is often a numpy array if single output, or a dict
+                if isinstance(results, dict):
+                    emb = results[self.output_name][0]
+                else:
+                    emb = results[0]
                 
         # 4. Normalize
         norm = np.linalg.norm(emb)
@@ -111,11 +101,14 @@ class Recognizer:
                  self.known_names = data["names"]
                  
                  logging.info(f"Loaded {len(self.known_names)} faces from cache.")
-                 # Check dimension. Old ArcFace R50 might be 512, MobileFaceNet might be 128.
-                 if len(self.known_encodings) > 0 and self.known_encodings.shape[1] != self.output_vstream_infos[0].shape[0]:
-                     logging.warning("!!! CACHE DIMENSION MISMATCH !!!")
-                     logging.warning(f"Cache has {self.known_encodings.shape[1]}d, Model needs {self.output_vstream_infos[0].shape[0]}d.")
-                     logging.warning("You MUST re-run 'python tools/process_database.py' to update your faces!")
+                 
+                 # Check dimension.
+                 if self.infer_model and len(self.known_encodings) > 0:
+                     expected_dim = self.infer_model.output().shape[0]
+                     if self.known_encodings.shape[1] != expected_dim:
+                         logging.warning("!!! CACHE DIMENSION MISMATCH !!!")
+                         logging.warning(f"Cache: {self.known_encodings.shape[1]}d, Model: {expected_dim}d.")
+                         logging.warning("Please re-run 'python tools/process_database.py'")
                  return
 
         logging.info("No cache found. Please run 'python tools/process_database.py' first.")
