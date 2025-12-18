@@ -82,9 +82,9 @@ class Recognizer:
                 
             bindings = self.configured_model.create_bindings()
             
-            # Prepare Output Buffer
+            # Prepare Output Buffer (Use uint8 to match 512-byte expected size)
             output_shape = self.infer_model.output().shape
-            output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.float32))
+            output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.uint8))
             
             # Prepare Input Data
             input_data = np.ascontiguousarray(face_blob)
@@ -96,7 +96,9 @@ class Recognizer:
             bindings.output(self.output_name).set_buffer(output_buffer)
             
             self.configured_model.run([bindings], 1000)
-            emb = output_buffer.copy()
+            
+            # Convert to float32 for math
+            emb = output_buffer.astype(np.float32)
             
             if np.all(emb == 0):
                 logging.error("Hailo Chip returned ALL ZEROS.")
