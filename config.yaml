@@ -6,15 +6,12 @@ system:
   frame_width: 640
   frame_height: 480
 
-email:
+telegram:
   enabled: true
-  sender_email: "your_email@gmail.com"
-  sender_password: "your_app_password"
-  receiver_emails:
-    - "owner1@example.com"
-  smtp_server: "smtp.gmail.com"
-  smtp_port: 587
-  cooldown_seconds: 300
+  bot_token: "YOUR_BOT_TOKEN_HERE"  # Get from @BotFather on Telegram
+  chat_id: "YOUR_CHAT_ID_HERE"      # Your Telegram chat ID
+  cooldown_seconds: 60  # Reduced from 300 for faster alerts
+
 
 paths:
   # Detector Model (YOLOv8-Face ONNX or PT)

@@ -147,7 +147,12 @@ def main():
                         cv2.rectangle(snap_img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 2)
                         cv2.imwrite(filename, snap_img)
                         logging.info(f"Stranger detected! Saved snapshot to {filename}")
+                        
+                        # Send Telegram notification with photo
+                        notifier.notify("Unknown", image_path=filename)
+                        
                         last_stranger_shot = now
+
 
                 # Draw Visuals
                 color = (0, 255, 0) if name not in ["Unknown", "Verifying...", "..."] else (0, 0, 255)

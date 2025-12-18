@@ -1,39 +1,68 @@
-import smtplib
-import ssl
-from email.message import EmailMessage
+import requests
 import time
 import logging
 import threading
+import cv2
+import os
 
 class Notifier:
     def __init__(self, config):
-        self.config = config["email"]
+        self.config = config["telegram"]
+        self.bot_token = self.config["bot_token"]
+        self.chat_id = self.config["chat_id"]
         self.last_sent = {}  # Store last sent time for each label/person
         self.lock = threading.Lock()
+        
+        # Test connection
+        if self.config.get("enabled", True):
+            self._test_connection()
 
-    def send_email(self, subject, body, image=None):
-        if not self.config["enabled"]:
+    def _test_connection(self):
+        """Test if bot token and chat ID are valid."""
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_token}/getMe"
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                bot_info = response.json()
+                logging.info(f"Telegram bot connected: @{bot_info['result']['username']}")
+            else:
+                logging.error(f"Telegram bot token invalid: {response.text}")
+        except Exception as e:
+            logging.error(f"Failed to connect to Telegram: {e}")
+
+    def send_message(self, text, image_path=None):
+        """Send a text message and optionally an image to Telegram."""
+        if not self.config.get("enabled", True):
             return
 
-        msg = EmailMessage()
-        msg.set_content(body)
-        msg["Subject"] = subject
-        msg["From"] = self.config["sender_email"]
-        msg["To"] = ", ".join(self.config["receiver_emails"])
-
-        context = ssl.create_default_context()
-
         try:
-            logging.info(f"Sending email: {subject}")
-            with smtplib.SMTP(self.config["smtp_server"], self.config["smtp_port"]) as server:
-                server.starttls(context=context)
-                server.login(self.config["sender_email"], self.config["sender_password"])
-                server.send_message(msg)
-            logging.info("Email sent successfully.")
+            if image_path and os.path.exists(image_path):
+                # Send photo with caption
+                url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+                with open(image_path, 'rb') as photo:
+                    files = {'photo': photo}
+                    data = {'chat_id': self.chat_id, 'caption': text}
+                    response = requests.post(url, files=files, data=data, timeout=10)
+                    
+                if response.status_code == 200:
+                    logging.info(f"Telegram photo sent: {text[:50]}...")
+                else:
+                    logging.error(f"Failed to send Telegram photo: {response.text}")
+            else:
+                # Send text only
+                url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+                data = {'chat_id': self.chat_id, 'text': text}
+                response = requests.post(url, data=data, timeout=10)
+                
+                if response.status_code == 200:
+                    logging.info(f"Telegram message sent: {text[:50]}...")
+                else:
+                    logging.error(f"Failed to send Telegram message: {response.text}")
+                    
         except Exception as e:
-            logging.error(f"Failed to send email: {e}")
+            logging.error(f"Telegram send error: {e}")
 
-    def notify(self, label):
+    def notify(self, label, image_path=None):
         """Sends a notification if outside the cooldown period."""
         now = time.time()
         cooldown = self.config.get("cooldown_seconds", 300)
@@ -44,13 +73,14 @@ class Notifier:
                 self.last_sent[label] = now
                 
                 if label == "Unknown":
-                    subject = "Security Alert: Unknown Person Detected"
-                    body = "An unknown person has been detected by your security camera."
+                    message = "🚨 *Security Alert*\n\nAn unknown person has been detected by your security camera."
                 else:
-                    subject = f"Welcome Home: {label}"
-                    body = f"{label} has arrived home."
+                    message = f"🏠 *Welcome Home*\n\n{label} has arrived home."
 
                 # Run in a separate thread to not block the main loop
-                threading.Thread(target=self.send_email, args=(subject, body)).start()
+                threading.Thread(
+                    target=self.send_message, 
+                    args=(message, image_path)
+                ).start()
             else:
                 logging.debug(f"Notification suppressed for {label} (Cooldown).")

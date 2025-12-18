@@ -21,69 +21,30 @@ class Camera:
         self.use_picam = False
 
     def start(self):
-        """Starts the camera stream."""
+        """Starts the camera stream using Picamera2."""
         logging.info("Starting camera...")
 
-        # 1. OPTION A: Picamera2 (Native Pi 5 support)
-        if HAS_PICAM2:
-            try:
-                logging.info("Initializing Picamera2...")
-                self.picam2 = Picamera2()
-                
-                # Configure for video capture
-                config = self.picam2.create_video_configuration(
-                    main={"size": (self.width, self.height), "format": "BGR888"}
-                )
-                self.picam2.configure(config)
-                self.picam2.start()
-                
-                self.use_picam = True
-                logging.info("Camera started successfully using Picamera2!")
-                return
-            except Exception as e:
-                logging.error(f"Picamera2 failed to start: {e}")
-                logging.warning("Falling back to OpenCV scan...")
-                self.use_picam = False
+        if not HAS_PICAM2:
+            raise RuntimeError("Picamera2 is required for Raspberry Pi 5. Please install: pip install picamera2")
 
-        # 2. OPTION B: OpenCV Auto-Scan (Fallback)
-        configs = [
-            (0, cv2.CAP_V4L2, 'MJPG'),
-            (0, cv2.CAP_V4L2, 'YUYV'),
-            (0, cv2.CAP_ANY,  None),
-            (1, cv2.CAP_V4L2, 'MJPG'),
-            (1, cv2.CAP_V4L2, 'YUYV'),
-        ]
-
-        for idx, backend, fourcc in configs:
-            backend_name = "V4L2" if backend == cv2.CAP_V4L2 else "ANY"
-            fmt_name = fourcc if fourcc else "Default"
-            logging.info(f"Testing OpenCV Index {idx} ({backend_name}, {fmt_name})...")
+        try:
+            logging.info("Initializing Picamera2...")
+            self.picam2 = Picamera2()
             
-            try:
-                cap = cv2.VideoCapture(idx, backend)
-                if not cap.isOpened():
-                    continue
-                
-                if fourcc:
-                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*fourcc))
-                
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-                
-                # Test Read
-                for _ in range(5):
-                    ret, frame = cap.read()
-                    if ret and frame is not None and frame.size > 0:
-                        logging.info(f" -> Success! Using OpenCV Index {idx}")
-                        self.cap = cap
-                        return
-                    time.sleep(0.1)
-                cap.release()
-            except:
-                if 'cap' in locals(): cap.release()
+            # Configure for video capture
+            config = self.picam2.create_video_configuration(
+                main={"size": (self.width, self.height), "format": "BGR888"}
+            )
+            self.picam2.configure(config)
+            self.picam2.start()
+            
+            self.use_picam = True
+            logging.info("Camera started successfully using Picamera2!")
+            
+        except Exception as e:
+            logging.error(f"Picamera2 failed to start: {e}")
+            raise RuntimeError(f"Camera initialization failed: {e}")
 
-        logging.error("Could not find any working camera.")
-        raise RuntimeError("Camera failed")
 
     def get_frame(self):
         """Reads a frame from the camera."""
