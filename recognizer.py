@@ -130,7 +130,7 @@ class Recognizer:
         logging.info("No cache found. Please run 'python tools/process_database.py' first.")
 
     def identify(self, frame, kpts=None, box=None):
-        if not self.known_encodings:
+        if self.known_encodings.size == 0:
             return "Unknown", 0.0
 
         target_emb = self.get_embedding(frame, kpts, box) 
