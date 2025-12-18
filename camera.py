@@ -1,32 +1,63 @@
+
 import cv2
 import time
 import logging
+import numpy as np
+
+# Try importing Picamera2 (The best way for Pi 5)
+try:
+    from picamera2 import Picamera2
+    HAS_PICAM2 = True
+except ImportError:
+    HAS_PICAM2 = False
+    logging.warning("Picamera2 not found. Falling back to OpenCV.")
 
 class Camera:
     def __init__(self, width=640, height=480):
         self.width = width
         self.height = height
         self.cap = None
+        self.picam2 = None
+        self.use_picam = False
 
     def start(self):
-        """Starts the camera stream with auto-discovery."""
+        """Starts the camera stream."""
         logging.info("Starting camera...")
-        
-        # Configurations to try (Index, Backend, FourCC)
-        # Pi 5 often has video0 as meta and video1 as data? Or index 0 works with MJPG.
+
+        # 1. OPTION A: Picamera2 (Native Pi 5 support)
+        if HAS_PICAM2:
+            try:
+                logging.info("Initializing Picamera2...")
+                self.picam2 = Picamera2()
+                
+                # Configure for video capture
+                config = self.picam2.create_video_configuration(
+                    main={"size": (self.width, self.height), "format": "BGR888"}
+                )
+                self.picam2.configure(config)
+                self.picam2.start()
+                
+                self.use_picam = True
+                logging.info("Camera started successfully using Picamera2!")
+                return
+            except Exception as e:
+                logging.error(f"Picamera2 failed to start: {e}")
+                logging.warning("Falling back to OpenCV scan...")
+                self.use_picam = False
+
+        # 2. OPTION B: OpenCV Auto-Scan (Fallback)
         configs = [
             (0, cv2.CAP_V4L2, 'MJPG'),
             (0, cv2.CAP_V4L2, 'YUYV'),
             (0, cv2.CAP_ANY,  None),
             (1, cv2.CAP_V4L2, 'MJPG'),
             (1, cv2.CAP_V4L2, 'YUYV'),
-            (1, cv2.CAP_ANY,  None),
         ]
 
         for idx, backend, fourcc in configs:
             backend_name = "V4L2" if backend == cv2.CAP_V4L2 else "ANY"
             fmt_name = fourcc if fourcc else "Default"
-            logging.info(f"Testing Camera Index {idx} with {backend_name} + {fmt_name}...")
+            logging.info(f"Testing OpenCV Index {idx} ({backend_name}, {fmt_name})...")
             
             try:
                 cap = cv2.VideoCapture(idx, backend)
@@ -39,50 +70,37 @@ class Camera:
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
                 
-                # Warmup / Test Read
-                success = False
-                for _ in range(10): # Try reading a few frames
+                # Test Read
+                for _ in range(5):
                     ret, frame = cap.read()
                     if ret and frame is not None and frame.size > 0:
-                        success = True
-                        break
+                        logging.info(f" -> Success! Using OpenCV Index {idx}")
+                        self.cap = cap
+                        return
                     time.sleep(0.1)
-                
-                if success:
-                    logging.info(f" -> Success! Using Camera Index {idx} ({backend_name}, {fmt_name})")
-                    self.cap = cap
-                    return
-                else:
-                    cap.release()
-                    
-            except Exception as e:
-                logging.warning(f"Error testing config: {e}")
+                cap.release()
+            except:
                 if 'cap' in locals(): cap.release()
 
-        # If we get here, nothing worked.
-        logging.error("Could not find a working camera configuration.")
-        logging.error("Troubleshooting: Run 'rpicam-hello -t 5' to verify hardware. Ensure no other app is using the camera.")
-        raise RuntimeError("Could not open camera")
-
-    def _check_opened(self):
-        if self.cap and self.cap.isOpened():
-            # Apply Settings
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            return True
-        return False
+        logging.error("Could not find any working camera.")
+        raise RuntimeError("Camera failed")
 
     def get_frame(self):
         """Reads a frame from the camera."""
+        if self.use_picam and self.picam2:
+            # Capture directly to numpy array (very fast)
+            return self.picam2.capture_array()
+            
         if self.cap:
-             # Add a small delay if reading too fast? No.
             ret, frame = self.cap.read()
             if ret:
                 return frame
         return None
 
     def release(self):
-        """Releases the camera resource."""
+        if self.use_picam and self.picam2:
+            self.picam2.stop()
+            self.picam2 = None
         if self.cap:
             self.cap.release()
             self.cap = None
