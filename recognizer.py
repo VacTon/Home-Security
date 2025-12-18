@@ -14,10 +14,6 @@ class Recognizer:
         self.known_encodings = []
         self.known_names = []
         
-        # 0. Initialize placeholders
-        self.vdevice = None
-        self.infer_model = None
-        
         # 1. Initialize Hailo Device (Modern High-Level API)
         logging.info(f"Initializing Hailo Recognition (High-Level API): {self.model_path}")
         try:
@@ -30,10 +26,16 @@ class Recognizer:
             
             # Set input shape (H, W, C)
             self.input_shape = self.infer_model.input().shape
-            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}")
+            
+            # CRITICAL: Configure the model ONCE here, not every time we process a face!
+            self.configured_model = self.infer_model.configure()
+            
+            logging.info(f"Hailo Model Loaded and Configured. Input: {self.input_name}")
             
         except Exception as e:
             logging.error(f"Failed to initialize Hailo Recognition: {e}")
+            self.infer_model = None
+            self.configured_model = None
 
         # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
@@ -75,37 +77,32 @@ class Recognizer:
             
         # 3. Hailo Inference (High-Level API with Bindings)
         try:
-            with self.infer_model.configure() as configured_model:
-                bindings = configured_model.create_bindings()
+            if self.configured_model is None:
+                return None
                 
-                # Prepare Output Buffer
-                output_shape = self.infer_model.output().shape
-                # Usually MobileFaceNet/ArcFace returns [512] or [128]
-                output_buffer = np.empty(output_shape, dtype=np.float32)
-                
-                # Bind Input
-                input_data = np.ascontiguousarray(face_blob)
-                if len(self.infer_model.input().shape) == 4:
-                     input_data = np.expand_dims(input_data, axis=0)
-                
-                bindings.input(self.input_name).set_buffer(input_data)
-                
-                # Bind Output (Explicitly ensure it's contiguous and float32)
-                output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.float32))
-                bindings.output(self.output_name).set_buffer(output_buffer)
-                
-                # Execute
-                configured_model.run([bindings], 1000)
-                emb = output_buffer.copy()
-                
-                # Debug Check
-                if np.all(emb == 0):
-                    logging.error("Hailo Chip returned ALL ZEROS. Check model/hardware.")
+            bindings = self.configured_model.create_bindings()
+            
+            # Prepare Output Buffer
+            output_shape = self.infer_model.output().shape
+            output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.float32))
+            
+            # Prepare Input Data
+            input_data = np.ascontiguousarray(face_blob)
+            if len(self.infer_model.input().shape) == 4:
+                 input_data = np.expand_dims(input_data, axis=0)
+            
+            # Bind and Run
+            bindings.input(self.input_name).set_buffer(input_data)
+            bindings.output(self.output_name).set_buffer(output_buffer)
+            
+            self.configured_model.run([bindings], 1000)
+            emb = output_buffer.copy()
+            
+            if np.all(emb == 0):
+                logging.error("Hailo Chip returned ALL ZEROS.")
                 
         except Exception as e:
             logging.error(f"Inference failed: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
             return None
                 
         # 4. Normalize
