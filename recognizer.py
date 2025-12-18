@@ -92,9 +92,9 @@ class Recognizer:
                  
                  logging.info(f"Loaded {len(self.known_names)} faces from cache.")
                  
-                 # Check dimension.
-                 if self.infer_model and len(self.known_encodings) > 0:
-                     expected_dim = self.infer_model.output().shape[0]
+                 # Check dimension (ONNX model outputs 512-d embeddings)
+                 if self.session and len(self.known_encodings) > 0:
+                     expected_dim = self.session.get_outputs()[0].shape[1]
                      if self.known_encodings.shape[1] != expected_dim:
                          logging.warning("!!! CACHE DIMENSION MISMATCH !!!")
                          logging.warning(f"Cache: {self.known_encodings.shape[1]}d, Model: {expected_dim}d.")
