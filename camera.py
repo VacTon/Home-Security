@@ -9,30 +9,59 @@ class Camera:
         self.cap = None
 
     def start(self):
-        """Starts the camera stream."""
+        """Starts the camera stream with auto-discovery."""
         logging.info("Starting camera...")
         
-        # 1. Try V4L2 Backend (Best for Pi 5 + Pip OpenCV)
-        try:
-            self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-            # Force MJPG (essential for Pi 5 in some cases)
-            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        # Configurations to try (Index, Backend, FourCC)
+        # Pi 5 often has video0 as meta and video1 as data? Or index 0 works with MJPG.
+        configs = [
+            (0, cv2.CAP_V4L2, 'MJPG'),
+            (0, cv2.CAP_V4L2, 'YUYV'),
+            (0, cv2.CAP_ANY,  None),
+            (1, cv2.CAP_V4L2, 'MJPG'),
+            (1, cv2.CAP_V4L2, 'YUYV'),
+            (1, cv2.CAP_ANY,  None),
+        ]
+
+        for idx, backend, fourcc in configs:
+            backend_name = "V4L2" if backend == cv2.CAP_V4L2 else "ANY"
+            fmt_name = fourcc if fourcc else "Default"
+            logging.info(f"Testing Camera Index {idx} with {backend_name} + {fmt_name}...")
             
-            if self._check_opened():
-                logging.info("Camera opened with V4L2 backend.")
-                return
-        except Exception:
-            pass
+            try:
+                cap = cv2.VideoCapture(idx, backend)
+                if not cap.isOpened():
+                    continue
+                
+                if fourcc:
+                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*fourcc))
+                
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                
+                # Warmup / Test Read
+                success = False
+                for _ in range(10): # Try reading a few frames
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        success = True
+                        break
+                    time.sleep(0.1)
+                
+                if success:
+                    logging.info(f" -> Success! Using Camera Index {idx} ({backend_name}, {fmt_name})")
+                    self.cap = cap
+                    return
+                else:
+                    cap.release()
+                    
+            except Exception as e:
+                logging.warning(f"Error testing config: {e}")
+                if 'cap' in locals(): cap.release()
 
-        # 2. Try Default Backend (Fallback)
-        logging.warning("V4L2 backend failed. Trying default...")
-        self.cap = cv2.VideoCapture(0)
-        if self._check_opened():
-             logging.info("Camera opened with default backend.")
-             return
-
-        # 3. Fail
-        logging.error("Could not open camera! Check connection or try 'libcamera-hello' in terminal.")
+        # If we get here, nothing worked.
+        logging.error("Could not find a working camera configuration.")
+        logging.error("Troubleshooting: Run 'rpicam-hello -t 5' to verify hardware. Ensure no other app is using the camera.")
         raise RuntimeError("Could not open camera")
 
     def _check_opened(self):
