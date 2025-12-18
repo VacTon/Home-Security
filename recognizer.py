@@ -73,17 +73,33 @@ class Recognizer:
         if face_blob is None:
             return None
             
-        # 3. Hailo Inference (High-Level API)
-        input_data = {self.input_name: np.expand_dims(face_blob, axis=0)}
-        
-        with self.infer_model.configure() as configured_model:
-            with configured_model.run() as run_model:
-                results = run_model.infer(input_data)
-                # results is often a numpy array if single output, or a dict
-                if isinstance(results, dict):
-                    emb = results[self.output_name][0]
-                else:
-                    emb = results[0]
+        # 3. Hailo Inference (High-Level API with Bindings)
+        try:
+            with self.infer_model.configure() as configured_model:
+                bindings = configured_model.create_bindings()
+                
+                # Prepare Output Buffer
+                output_shape = self.infer_model.output().shape
+                # Usually MobileFaceNet/ArcFace returns [512] or [128]
+                output_buffer = np.empty(output_shape, dtype=np.float32)
+                
+                # Bind Input
+                # Note: Some models expect batch dim, some don't. 
+                # We'll try to match the expected shape.
+                input_data = face_blob
+                if len(self.infer_model.input().shape) == 4:
+                     input_data = np.expand_dims(face_blob, axis=0)
+                
+                bindings.input(self.input_name).set_buffer(input_data)
+                bindings.output(self.output_name).set_buffer(output_buffer)
+                
+                # Execute
+                configured_model.run(bindings, 1000) # 1000ms timeout
+                emb = output_buffer.copy()
+                
+        except Exception as e:
+            logging.error(f"Inference failed: {e}")
+            return None
                 
         # 4. Normalize
         norm = np.linalg.norm(emb)
