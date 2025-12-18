@@ -40,9 +40,14 @@ def main():
 
     logging.info("System started. Press 'q' to quit.")
 
-    # Stranger Snapshot coodown
+    # FPS Counter
+    fps_start_time = time.time()
+    fps_frame_count = 0
+    fps_display = 0.0
+    
+    # Stranger Snapshot cooldown
     last_stranger_shot = 0
-    stranger_cooldown = 15.0 # seconds
+    stranger_cooldown = 10.0  # seconds (reduced from 15)
     stranger_dir = "strangers"
     if not os.path.exists(stranger_dir):
         os.makedirs(stranger_dir, exist_ok=True)
@@ -64,7 +69,14 @@ def main():
                 continue
 
             frame_count += 1
+            fps_frame_count += 1
             processed_frame = frame.copy()
+            
+            # Calculate FPS every second
+            if time.time() - fps_start_time >= 1.0:
+                fps_display = fps_frame_count / (time.time() - fps_start_time)
+                fps_frame_count = 0
+                fps_start_time = time.time()
 
             # 1. Detect (Runs every frame for smooth boxes)
             detections = detector.detect(frame)
@@ -175,6 +187,10 @@ def main():
             # Else: we technically should update centers to avoid "losing" the track, but 30 frames is long.
             # actually 30 frames (1s) is too long for purely positional matching if person moves.
             # Let's try 5 frames (approx 150ms).
+            
+            # Display FPS counter
+            cv2.putText(processed_frame, f"FPS: {fps_display:.1f}", (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             
             # Show Frame
             cv2.imshow("Security Feed", processed_frame)
