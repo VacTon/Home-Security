@@ -84,21 +84,28 @@ class Recognizer:
                 output_buffer = np.empty(output_shape, dtype=np.float32)
                 
                 # Bind Input
-                # Note: Some models expect batch dim, some don't. 
-                # We'll try to match the expected shape.
-                input_data = face_blob
+                input_data = np.ascontiguousarray(face_blob)
                 if len(self.infer_model.input().shape) == 4:
-                     input_data = np.expand_dims(face_blob, axis=0)
+                     input_data = np.expand_dims(input_data, axis=0)
                 
                 bindings.input(self.input_name).set_buffer(input_data)
+                
+                # Bind Output (Explicitly ensure it's contiguous and float32)
+                output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.float32))
                 bindings.output(self.output_name).set_buffer(output_buffer)
                 
-                # Execute (Pass bindings as a LIST)
-                configured_model.run([bindings], 1000) # 1000ms timeout
+                # Execute
+                configured_model.run([bindings], 1000)
                 emb = output_buffer.copy()
+                
+                # Debug Check
+                if np.all(emb == 0):
+                    logging.error("Hailo Chip returned ALL ZEROS. Check model/hardware.")
                 
         except Exception as e:
             logging.error(f"Inference failed: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             return None
                 
         # 4. Normalize
