@@ -14,14 +14,19 @@ class Recognizer:
         self.known_encodings = []
         self.known_names = []
         
+        # 0. Initialize placeholders to avoid AttributeErrors on failure
+        self.vdevice = None
+        self.network_group = None
+        self.output_vstream_infos = []
+        
         # 1. Initialize Hailo Device
         logging.info(f"Initializing Hailo Device for Recognition: {self.model_path}")
         try:
             self.vdevice = VDevice()
             self.hef = HEF(self.model_path)
             
-            # Configure network group
-            self.configure_params = ConfigureParams.get_default_config(self.hef)
+            # Use the newer API method to create configure params
+            self.configure_params = self.hef.create_configure_params()
             self.network_group = self.vdevice.configure(self.hef, self.configure_params)[0]
             
             # Get stream info
@@ -31,13 +36,13 @@ class Recognizer:
             self.input_name = self.input_vstream_infos[0].name
             self.output_name = self.output_vstream_infos[0].name
             
-            # Input shape usually (112, 112, 3) for ArcFace
-            self.input_shape = self.input_vstream_infos[0].shape # (H, W, C)
+            # Input shape (H, W, C)
+            self.input_shape = self.input_vstream_infos[0].shape
             logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}, Output: {self.output_name}")
             
         except Exception as e:
             logging.error(f"Failed to initialize Hailo Recognition: {e}")
-            self.vdevice = None
+            # Keep self.vdevice as None to trigger fallback if any
 
         # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
