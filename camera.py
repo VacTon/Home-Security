@@ -9,26 +9,51 @@ class Camera:
         self.cap = None
 
     def start(self):
-        """Starts the camera stream using Libcamera (via OpenCV backend)."""
+        """Starts the camera stream."""
         logging.info("Starting camera...")
-        # On Pi 5 with libcamera, index 0 usually works if legacy stack is off.
-        # Sometimes GStreamer pipeline is needed, but let's try standard V4L2 first.
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        
+        # 1. Try V4L2 Backend (Best for Pi 5 + Pip OpenCV)
+        try:
+            self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+            if self._check_opened():
+                logging.info("Camera opened with V4L2 backend.")
+                return
+        except Exception:
+            pass
 
-        if not self.cap.isOpened():
-            logging.error("Could not open camera. Ensure libcamera is working.")
-            raise RuntimeError("Could not open camera")
+        # 2. Try Default Backend (Fallback)
+        logging.warning("V4L2 backend failed. Trying default...")
+        self.cap = cv2.VideoCapture(0)
+        if self._check_opened():
+             logging.info("Camera opened with default backend.")
+             return
+
+        # 3. Fail
+        logging.error("Could not open camera! Check connection or try 'libcamera-hello' in terminal.")
+        raise RuntimeError("Could not open camera")
+
+    def _check_opened(self):
+        if self.cap and self.cap.isOpened():
+            # Apply Settings
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            return True
+        return False
 
     def get_frame(self):
         """Reads a frame from the camera."""
         if self.cap:
+             # Add a small delay if reading too fast? No.
             ret, frame = self.cap.read()
             if ret:
                 return frame
         return None
 
-    def stop(self):
+    def release(self):
+        """Releases the camera resource."""
         if self.cap:
             self.cap.release()
+            self.cap = None
+
+    def stop(self):
+        self.release()
