@@ -2,34 +2,44 @@ import cv2
 import numpy as np
 import logging
 import os
-import onnxruntime as ort
 import pickle
+from hailo_platform import VDevice, HEF, ConfigureParams, InferVStreams, InputVStreamParams, OutputVStreamParams
 
 class Recognizer:
     def __init__(self, config):
         self.faces_dir = config["paths"]["faces_dir"]
-        self.model_path = config["paths"].get("recognition_model_path", "models/w600k_r50.onnx")
-        self.tolerance = config["system"]["recognition_tolerance"] # e.g. 0.6 for ArcFace (cosine distance)
+        self.model_path = config["paths"].get("recognition_model_path", "models/arcface_mobilefacenet.hef")
+        self.tolerance = config["system"]["recognition_tolerance"]
         
         self.known_encodings = []
         self.known_names = []
         
-        # Load ONNX Model
-        if os.path.exists(self.model_path):
-            logging.info(f"Loading Recognition Model: {self.model_path}")
-            try:
-                providers = ['CPUExecutionProvider'] # Add 'CUDAExecutionProvider' if on PC/Jetson
-                self.session = ort.InferenceSession(self.model_path, providers=providers)
-                self.input_name = self.session.get_inputs()[0].name
-                self.input_shape = self.session.get_inputs()[0].shape # [1, 3, 112, 112] usually
-            except Exception as e:
-                logging.error(f"Failed to load recognition model: {e}")
-                self.session = None
-        else:
-            logging.warning(f"Recognition model not found at {self.model_path}. Recognition will fail.")
-            self.session = None
+        # 1. Initialize Hailo Device
+        logging.info(f"Initializing Hailo Device for Recognition: {self.model_path}")
+        try:
+            self.vdevice = VDevice()
+            self.hef = HEF(self.model_path)
+            
+            # Configure network group
+            self.configure_params = ConfigureParams.get_default_config(self.hef)
+            self.network_group = self.vdevice.configure(self.hef, self.configure_params)[0]
+            
+            # Get stream info
+            self.input_vstream_infos = self.hef.get_input_vstream_infos()
+            self.output_vstream_infos = self.hef.get_output_vstream_infos()
+            
+            self.input_name = self.input_vstream_infos[0].name
+            self.output_name = self.output_vstream_infos[0].name
+            
+            # Input shape usually (112, 112, 3) for ArcFace
+            self.input_shape = self.input_vstream_infos[0].shape # (H, W, C)
+            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}, Output: {self.output_name}")
+            
+        except Exception as e:
+            logging.error(f"Failed to initialize Hailo Recognition: {e}")
+            self.vdevice = None
 
-        # Standard ArcFace 5-point landmarks (112x112)
+        # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
             [38.2946, 51.6963],
             [73.5318, 51.5014],
@@ -39,115 +49,73 @@ class Recognizer:
         ], dtype=np.float32)
 
     def preprocess(self, img, kpts=None, box=None):
-        """
-        Aligns and normalizes face.
-        Input: 
-            img: Full frame
-            kpts: [5, 2] points (eye_l, eye_r, nose, mouth_l, mouth_r)
-            box: [x1, y1, x2, y2] fallback if kpts missing
-        Output:
-            aligned_face: (1, 3, 112, 112) normalized tensor
-        """
+        """Aligns and prepares face for Hailo."""
         # 1. Align
-        if kpts is not None and kpts.shape == (5, 2):
+        if kpts is not None and len(kpts) == 5:
             st = cv2.estimateAffinePartial2D(kpts, self.target_kps, method=cv2.LMEDS)[0]
             face_img = cv2.warpAffine(img, st, (112, 112), borderValue=0.0)
-        else:
-            # Fallback: Crop and Resize
-            x1, y1, x2, y2 = box
-            w, h = x2-x1, y2-y1
-            # Add some margin?
+        elif box is not None:
+            x1, y1, x2, y2 = map(int, box)
             face_img_raw = img[max(0, y1):y2, max(0, x1):x2]
-            if face_img_raw.size == 0:
-                return None
+            if face_img_raw.size == 0: return None
             face_img = cv2.resize(face_img_raw, (112, 112))
+        else:
+            return None
 
-        # 2. Normalize (0-255 -> -1 to 1 or 0-1 depending on model)
-        # Standard ArcFace is (pixel - 127.5) / 128.0
+        # 2. Format for Hailo
+        # Most Hailo HEFs for ArcFace expect RGB, uint8
         face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
-        face_img = np.transpose(face_img, (2, 0, 1)) # HWC -> CHW
-        face_img = np.expand_dims(face_img, axis=0).astype(np.float32)
-        face_img = (face_img - 127.5) / 128.0
-        
-        return face_img
+        # Note: If the HEF was compiled with normalization, we don't divide by 255.
+        # MobileFaceNet HEF usually takes 0-255 uint8.
+        return face_img.astype(np.uint8)
 
     def get_embedding(self, img, kpts=None, box=None):
-        if self.session is None:
+        if self.vdevice is None:
             return None
         
-        blob = self.preprocess(img, kpts, box)
-        if blob is None:
+        face_blob = self.preprocess(img, kpts, box)
+        if face_blob is None:
             return None
             
-        emb = self.session.run(None, {self.input_name: blob})[0]
-        # Normalize embedding to unit length
-        # emb shape (1, 512)
-        norm = np.linalg.norm(emb, axis=1, keepdims=True)
-        return emb / (norm + 1e-10)
+        # 3. Hailo Inference
+        input_data = {self.input_name: np.expand_dims(face_blob, axis=0)}
+        
+        # Use simple inference pipeline
+        input_params = InputVStreamParams.make_from_network_group(self.network_group, quantized=False)
+        output_params = OutputVStreamParams.make_from_network_group(self.network_group, quantized=False)
+        
+        with InferVStreams(self.network_group, input_params, output_params) as infer_pipeline:
+            # Activate and run
+            with self.network_group.activate_config(self.configure_params):
+                results = infer_pipeline.infer(input_data)
+                emb = results[self.output_name][0] # Get first batch
+                
+        # 4. Normalize
+        norm = np.linalg.norm(emb)
+        return (emb / (norm + 1e-10)).reshape(1, -1)
 
     def load_known_faces(self):
         logging.info("Loading known faces...")
-        if not os.path.exists(self.faces_dir):
-            os.makedirs(self.faces_dir, exist_ok=True)
-            return
-
-        # Look for pre-saved encodings
         encodings_file = os.path.join(self.faces_dir, "encodings.pkl")
+        
         if os.path.exists(encodings_file):
              with open(encodings_file, "rb") as f:
                  data = pickle.load(f)
-                 self.known_encodings = data["encodings"]
+                 # Ensure we stack into a single matrix (N, Dim)
+                 self.known_encodings = np.vstack(data["encodings"]) if data["encodings"] else np.array([])
                  self.known_names = data["names"]
+                 
                  logging.info(f"Loaded {len(self.known_names)} faces from cache.")
-                 return # We can skip rescanning or merge. For now return.
+                 # Check dimension. Old ArcFace R50 might be 512, MobileFaceNet might be 128.
+                 if len(self.known_encodings) > 0 and self.known_encodings.shape[1] != self.output_vstream_infos[0].shape[0]:
+                     logging.warning("!!! CACHE DIMENSION MISMATCH !!!")
+                     logging.warning(f"Cache has {self.known_encodings.shape[1]}d, Model needs {self.output_vstream_infos[0].shape[0]}d.")
+                     logging.warning("You MUST re-run 'python tools/process_database.py' to update your faces!")
+                 return
 
-        # Scan directories
-        for person_name in os.listdir(self.faces_dir):
-            person_dir = os.path.join(self.faces_dir, person_name)
-            if not os.path.isdir(person_dir):
-                continue
-                
-            for filename in os.listdir(person_dir):
-                filepath = os.path.join(person_dir, filename)
-                img = cv2.imread(filepath)
-                if img is None:
-                    continue
-                
-                # Assume image contains only the face or main face
-                # We need to detect keypoints for best alignment.
-                # However, our detector is separate. 
-                # For simplicity in 'loading', we might just resize if no external detector is used here.
-                # Ideally, we should use the Detector inside here too, but circular dependency.
-                # Simple Hack: Resize to 112x112 directly if it looks like a crop, 
-                # Or simplistic center crop.
-                
-                # BETTER: Use a separate alignment step for database creation.
-                # For now, we'll try just resizing/cropping center.
-                h, w, _ = img.shape
-                # Center crop
-                # ...
-                # Actually, let's just resize. It reduces accuracy but works for a prototype.
-                blob = cv2.resize(img, (112, 112))
-                # Normalize logic same as convert
-                blob = cv2.cvtColor(blob, cv2.COLOR_BGR2RGB)
-                blob = np.transpose(blob, (2, 0, 1))
-                blob = np.expand_dims(blob, axis=0).astype(np.float32)
-                blob = (blob - 127.5) / 128.0
-                
-                if self.session:
-                    emb = self.session.run(None, {self.input_name: blob})[0]
-                    norm = np.linalg.norm(emb, axis=1, keepdims=True)
-                    emb = emb / norm
-                    
-                    self.known_encodings.append(emb[0])
-                    self.known_names.append(person_name)
-
-        logging.info(f"Loaded {len(self.known_names)} known faces.")
+        logging.info("No cache found. Please run 'python tools/process_database.py' first.")
 
     def identify(self, frame, kpts=None, box=None):
-        """
-        Returns: name (str), confidence (float)
-        """
         if not self.known_encodings:
             return "Unknown", 0.0
 
@@ -155,20 +123,19 @@ class Recognizer:
         if target_emb is None:
             return "Unknown", 0.0
             
-        # Compare with known
-        # Cosine Similarity = dot product (since vectors are unit length)
-        # target_emb is (1, 512)
-        # known is (N, 512)
-        sims = np.dot(self.known_encodings, target_emb.T).flatten() # (N,)
-        
+        # Cosine Similarity
+        sims = np.dot(self.known_encodings, target_emb.T).flatten()
         best_idx = np.argmax(sims)
         best_sim = sims[best_idx]
         
-        # ArcFace thresholds usually: 0.25 (strict) to 0.4 (loose)?? 
-        # Actually cosine sim: same person > 0.3 or 0.4 usually. 
-        # distance = 1 - sim?
-        # Let's assume threshold is similarity.
         if best_sim > self.tolerance:
              return self.known_names[best_idx], float(best_sim)
              
         return "Unknown", float(best_sim)
+
+    def __del__(self):
+        # Cleanup device
+        if hasattr(self, 'vdevice') and self.vdevice:
+            # VDevice doesn't always need explicit close in some python wrappers,
+            # but it is good practice.
+            pass
