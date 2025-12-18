@@ -27,10 +27,12 @@ class Recognizer:
             # Set input shape (H, W, C)
             self.input_shape = self.infer_model.input().shape
             
-            # CRITICAL: Configure the model ONCE here, not every time we process a face!
+            # CRITICAL: Configure and ACTIVATE the model once.
+            # Calling .__enter__() effectively 'starts' the hardware streams.
             self.configured_model = self.infer_model.configure()
+            self.configured_model.__enter__() 
             
-            logging.info(f"Hailo Model Loaded and Configured. Input: {self.input_name}")
+            logging.info(f"Hailo Model Loaded and Activated. Input: {self.input_name}")
             
         except Exception as e:
             logging.error(f"Failed to initialize Hailo Recognition: {e}")
