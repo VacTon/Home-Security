@@ -15,6 +15,9 @@ class Camera:
         # 1. Try V4L2 Backend (Best for Pi 5 + Pip OpenCV)
         try:
             self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+            # Force MJPG (essential for Pi 5 in some cases)
+            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            
             if self._check_opened():
                 logging.info("Camera opened with V4L2 backend.")
                 return
