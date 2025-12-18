@@ -14,30 +14,23 @@ class Recognizer:
         self.known_encodings = []
         self.known_names = []
         
-        # 1. Initialize Hailo Device (Modern High-Level API)
-        logging.info(f"Initializing Hailo Recognition (High-Level API): {self.model_path}")
+        # 1. Initialize Hailo Device (Simplified Synchronous API)
+        logging.info(f"Initializing Hailo Recognition: {self.model_path}")
+        self.infer_model = None
         try:
             self.vdevice = VDevice()
             self.infer_model = self.vdevice.create_infer_model(self.model_path)
             
-            # Identify input/output names
+            # Get input/output metadata
             self.input_name = self.infer_model.input().name
             self.output_name = self.infer_model.output().name
-            
-            # Set input shape (H, W, C)
             self.input_shape = self.infer_model.input().shape
             
-            # CRITICAL: Configure and ACTIVATE the model once.
-            # Calling .__enter__() effectively 'starts' the hardware streams.
-            self.configured_model = self.infer_model.configure()
-            self.configured_model.__enter__() 
-            
-            logging.info(f"Hailo Model Loaded and Activated. Input: {self.input_name}")
+            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}")
             
         except Exception as e:
-            logging.error(f"Failed to initialize Hailo Recognition: {e}")
+            logging.error(f"Failed to initialize Hailo: {e}")
             self.infer_model = None
-            self.configured_model = None
 
         # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
@@ -62,11 +55,8 @@ class Recognizer:
         else:
             return None
 
-        # 2. Format for Hailo
-        # Most Hailo HEFs for ArcFace expect RGB, uint8
+        # 2. Format for Hailo (RGB uint8)
         face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
-        # Note: If the HEF was compiled with normalization, we don't divide by 255.
-        # MobileFaceNet HEF usually takes 0-255 uint8.
         return face_img.astype(np.uint8)
 
     def get_embedding(self, img, kpts=None, box=None):
@@ -77,33 +67,36 @@ class Recognizer:
         if face_blob is None:
             return None
             
-        # 3. Hailo Inference (High-Level API with Bindings)
+        # 3. Hailo Inference (Synchronous - configure each time for stability)
         try:
-            if self.configured_model is None:
-                return None
-                
-            bindings = self.configured_model.create_bindings()
-            
-            # Prepare Output Buffer (Use uint8 to match 512-byte expected size)
-            output_shape = self.infer_model.output().shape
-            output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.uint8))
-            
-            # Prepare Input Data
+            # Prepare input (add batch dimension if needed)
             input_data = np.ascontiguousarray(face_blob)
-            if len(self.infer_model.input().shape) == 4:
-                 input_data = np.expand_dims(input_data, axis=0)
+            if len(self.input_shape) == 4:
+                input_data = np.expand_dims(input_data, axis=0)
             
-            # Bind and Run
-            bindings.input(self.input_name).set_buffer(input_data)
-            bindings.output(self.output_name).set_buffer(output_buffer)
-            
-            self.configured_model.run([bindings], 1000)
-            
-            # Convert to float32 for math
-            emb = output_buffer.astype(np.float32)
-            
-            if np.all(emb == 0):
-                logging.error("Hailo Chip returned ALL ZEROS.")
+            # Run inference with automatic configuration
+            with self.infer_model.configure() as configured_model:
+                # Create bindings
+                bindings = configured_model.create_bindings()
+                
+                # Prepare output buffer (uint8 to match 512-byte size)
+                output_shape = self.infer_model.output().shape
+                output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.uint8))
+                
+                # Set buffers
+                bindings.input(self.input_name).set_buffer(input_data)
+                bindings.output(self.output_name).set_buffer(output_buffer)
+                
+                # Wait for async ready and run
+                configured_model.wait_for_async_ready(timeout_ms=1000)
+                configured_model.run([bindings], 1000)
+                
+                # Convert to float32
+                emb = output_buffer.astype(np.float32)
+                
+                if np.all(emb == 0):
+                    logging.warning("Hailo returned zeros")
+                    return None
                 
         except Exception as e:
             logging.error(f"Inference failed: {e}")
