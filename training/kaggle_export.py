@@ -12,137 +12,128 @@ import requests
 import shutil
 import warnings
 
-# Suppress warnings
+# Suppress all warnings to keep output clean
 warnings.filterwarnings("ignore")
 
 def download_file(url, filename):
-    print(f"Downloading {filename} from {url}...")
+    print(f"Downloading {filename}...")
     try:
         response = requests.get(url, stream=True)
         response.raise_for_status()
         with open(filename, 'wb') as f:
             for chunk in response.iter_content(8192):
                 f.write(chunk)
-        print(f"Downloaded {filename}")
+        print(f" -> Done.")
         return True
     except Exception as e:
-        print(f"Failed to download {filename}: {e}")
+        print(f" -> Failed: {e}")
         return False
 
 def main():
-    print("=== Worker Started: Exporting Models ===")
+    print("\n=== Worker Process: Starting Export ===")
     
+    # Imports inside the protected environment
     import torch
     import numpy as np
     import onnx
     import insightface
     from ultralytics import YOLO
     
-    print(f"Numpy version: {np.__version__}")
-    print(f"Insightface version: {insightface.__version__}")
+    print(f"Environment Check: Numpy {np.__version__}, InsightFace {insightface.__version__}")
 
     # --- 1. Export Detector (YOLOv8-Face) ---
-    print("\n[1/2] Processing Detector (YOLOv8n-Face)...")
+    print("\n[Step 1/2] Processing Detector (YOLOv8n-Face)")
     face_model_url = "https://github.com/akanametov/yolo-face/releases/download/v0.0.0/yolov8n-face.pt"
     face_model_pt = "yolov8n-face.pt"
     
     if not os.path.exists(face_model_pt):
         if not download_file(face_model_url, face_model_pt):
-            print("Using fallback yolov8n.pt (standard) just to ensure workflow completion...")
+             # Fallback if specific face model download fails
+            print(" ! Warning: Download failed. Using generic yolov8n.pt as placeholder.")
             face_model_pt = "yolov8n.pt"
 
     print(f"Exporting {face_model_pt} to ONNX...")
     try:
         model = YOLO(face_model_pt)
-        # Export with fixed size for Pi 5 NPU/CPU stability
-        export_path = model.export(format="onnx", imgsz=640, dynamic=False)
-        print(f"Detector SUCCESS: {export_path}")
+        # Exporting with fixed size (640) for best stability
+        path = model.export(format="onnx", imgsz=640, dynamic=False)
+        print(f" -> Detector Success: {path}")
     except Exception as e:
-        print(f"Detector Export Failed: {e}")
+        print(f" -> Detector Failed: {e}")
 
     # --- 2. Export Recognizer (ArcFace) ---
-    print("\n[2/2] Processing Recognizer (InsightFace - Buffalo_S/L)...")
+    print("\n[Step 2/2] Processing Recognizer (Buffalo_L)")
     
-    # We use buffalo_l (ResNet50) for accuracy, or buffalo_s (MobileNet) for speed.
-    # Pi 5 can handle ResNet50 typically.
+    # Using 'buffalo_l' (ResNet50) for best accuracy on Pi 5
     model_pack = 'buffalo_l' 
     
     try:
-        print(f"Initializing FaceAnalysis with {model_pack}...")
-        # providers=['CPUExecutionProvider'] essential for Kaggle CPU envs to avoid CUDA errors if not present
+        # Force CPU provider
         app = insightface.app.FaceAnalysis(name=model_pack, providers=['CPUExecutionProvider'])
         app.prepare(ctx_id=0, det_size=(640, 640))
         
-        # Locate the downloaded file
-        # InsightFace downloads to ~/.insightface/models/buffalo_l/w600k_r50.onnx
-        home_dir = os.path.expanduser("~")
-        model_root = os.path.join(home_dir, ".insightface", "models", model_pack)
-        
-        # Possible names depending on pack
-        possible_names = ["w600k_r50.onnx", "2d106det.onnx", "w600k_mbf.onnx"]
+        # Locate the underlying ONNX file
+        home = os.path.expanduser("~")
+        model_root = os.path.join(home, ".insightface", "models", model_pack)
         found = False
         
         if os.path.exists(model_root):
             for fname in os.listdir(model_root):
+                # w600k_r50.onnx is the recognition model in buffalo_l
                 if fname.endswith(".onnx") and "det" not in fname and "gender" not in fname:
-                    # Usually the largest one is the recognition model
-                    # For buffalo_l: w600k_r50.onnx
-                    # For buffalo_s: w600k_mbf.onnx
-                    src = os.path.join(model_root, fname)
-                    dst = fname
-                    shutil.copy(src, dst)
-                    print(f"Recognizer SUCCESS: Copied {src} to {dst}")
+                    shutil.copy(os.path.join(model_root, fname), fname)
+                    print(f" -> Recognizer Success: Copied {fname}")
                     found = True
         
         if not found:
-            print(f"Could not automatically identify the recognition ONNX in {model_root}")
-            print("Listing directory:")
-            for root, dirs, files in os.walk(model_root):
-                 for f in files: print(os.path.join(root, f))
-                 
+             print(" ! Error: Could not locate .onnx file in insightface cache.")
+             
     except Exception as e:
-        print(f"Recognizer Setup Failed: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f" -> Recognizer Failed: {e}")
 
-    print("\n=== Export Complete ===")
-    print("Files to download:")
-    print("1. *.onnx (Detector)")
-    print("2. *.onnx (Recognizer)")
+    print("\n=======================================")
+    print("       EXPORT COMPLETED ")
+    print("=======================================")
+    print("Check the 'Output' file browser on the right for:")
+    print(" 1. yolov8n-face.onnx (or similar)")
+    print(" 2. w600k_r50.onnx (or similar)")
 
 if __name__ == "__main__":
     main()
 """
 
-def install_dependencies():
-    print("Installing dependencies (this may take a minute)...")
-    # Pin numpy<2.0 to avoid SciPy/InsightFace conflicts on Colab/Kaggle
-    pkgs = [
-        "numpy<2.0", 
-        "scipy", 
-        "ultralytics", 
-        "insightface", 
-        "onnx", 
-        "onnxruntime"
-    ]
-    subprocess.check_call([sys.executable, "-m", "pip", "install"] + pkgs)
-
-def run_worker():
-    # Write the worker script to a file
-    worker_filename = "export_worker_temp.py"
-    with open(worker_filename, "w") as f:
-        f.write(WORKER_SCRIPT)
+def setup_and_run():
+    print("=== Setting up Isolated Environment (Virtual Environment) ===")
+    print("This ensures no conflicts with Kaggle's pre-installed packages.")
     
-    print("Running worker script in a fresh process...")
-    try:
-        subprocess.check_call([sys.executable, worker_filename])
-    except subprocess.CalledProcessError as e:
-        print(f"Error running worker: {e}")
-    finally:
-        if os.path.exists(worker_filename):
-            os.remove(worker_filename)
+    venv_dir = "temp_venv"
+    
+    # 1. Create Venv if not exists
+    if not os.path.exists(venv_dir):
+        print(f"Creating venv in {venv_dir}...")
+        subprocess.check_call([sys.executable, "-m", "venv", venv_dir])
+        
+    # Determine paths
+    if os.name == "nt":
+        pip_cmd = os.path.join(venv_dir, "Scripts", "pip")
+        python_cmd = os.path.join(venv_dir, "Scripts", "python")
+    else:
+        pip_cmd = os.path.join(venv_dir, "bin", "pip")
+        python_cmd = os.path.join(venv_dir, "bin", "python")
+
+    # 2. Install dependencies into Venv
+    print("Installing libraries into venv...")
+    # Essential packages only
+    pkgs = ["numpy<2.0", "onnx", "onnxruntime", "ultralytics", "insightface", "scipy"]
+    subprocess.check_call([pip_cmd, "install"] + pkgs)
+    
+    # 3. Write Worker Script
+    with open("worker.py", "w") as f:
+        f.write(WORKER_SCRIPT)
+        
+    # 4. Run Worker with Venv Python
+    print("\n=== Launching Worker Script ===")
+    subprocess.check_call([python_cmd, "worker.py"])
 
 if __name__ == "__main__":
-    install_dependencies()
-    print("\nDependencies installed. Launching logic...")
-    run_worker()
+    setup_and_run()
