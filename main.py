@@ -40,58 +40,80 @@ def main():
 
     logging.info("System started. Press 'q' to quit.")
 
+    # Stranger Snapshot coodown
+    last_stranger_shot = 0
+    stranger_cooldown = 15.0 # seconds
+    stranger_dir = "strangers"
+    if not os.path.exists(stranger_dir):
+        os.makedirs(stranger_dir, exist_ok=True)
+
     try:
         while True:
             frame = camera.get_frame()
             if frame is None:
-                logging.warning("Empty frame received.")
+                logging.warning("Empty frame")
                 time.sleep(0.1)
                 continue
 
-            # 1. Detect Faces (YOLO)
+            # Detect
             detections = detector.detect(frame)
-
-            # 2. Process Detections
+            
+            # --- Recognition Loop ---
+            annotated_frame = frame.copy()
+            
             for det in detections:
-                box = det["box"] # [x1, y1, x2, y2]
-                x1, y1, x2, y2 = box
+                box = det["box"]
                 kpts = det.get("keypoints")
-
-                # Draw bounding box
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
-                # Draw Keypoints if available
-                if kpts is not None:
-                     for kp in kpts:
-                         cv2.circle(frame, (int(kp[0]), int(kp[1])), 2, (0, 255, 255), -1)
-
-                # 3. Recognize Face
-                # Pass full frame + info for alignment
+                # Identify
                 name, conf = recognizer.identify(frame, kpts=kpts, box=box)
                 
-                # Draw Name
+                # Logic: Notify or Snapshot
+                if name == "Unknown":
+                    # Stranger Logic
+                    now = time.time()
+                    if (now - last_stranger_shot) > stranger_cooldown:
+                        timestamp = time.strftime("%Y%m%d_%H%M%S")
+                        filename = f"{stranger_dir}/stranger_{timestamp}.jpg"
+                        
+                        # Prepare visual alert on the snapshot
+                        snap_img = annotated_frame.copy()
+                        # Draw the box on the snapshot so we know who it was
+                        cv2.rectangle(snap_img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 2)
+                        
+                        cv2.imwrite(filename, snap_img)
+                        logging.info(f"Stranger detected! Saved snapshot to {filename}")
+                        last_stranger_shot = now
+                else:
+                    # Known Person Logic (Email Alert if needed - implemented in notifier?)
+                    # For now just log
+                    pass
+
+                # Draw Visuals
+                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                 label = f"{name} ({conf:.2f})"
-                cv2.putText(frame, label, (x1, y1 - 10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                
+                x1, y1, x2, y2 = map(int, box)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(annotated_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                
+                # Draw Keypoints
+                if kpts is not None:
+                    for kp in kpts:
+                        cv2.circle(annotated_frame, (int(kp[0]), int(kp[1])), 2, (0, 255, 255), -1)
 
-                # 4. Notify
-                if name != "Unknown":
-                    notifier.notify(name)
-                elif name == "Unknown":
-                    # Optional: Notify for strangers too
-                    notifier.notify("Unknown")
-
-            # Display
-            cv2.imshow("Security Feed", frame)
-
+            # Show Frame
+            cv2.imshow("Security Feed", annotated_frame)
+            
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+                
     except KeyboardInterrupt:
         logging.info("Stopping...")
     finally:
-        camera.stop()
+        camera.release()
         cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
