@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import time
+import shutil
 
 # --- Worker Script Content ---
 WORKER_SCRIPT = r"""
