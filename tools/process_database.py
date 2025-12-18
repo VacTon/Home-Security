@@ -17,7 +17,7 @@ import pickle
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def load_config():
-    with open("../config.yaml", "r") as f:
+    with open("config.yaml", "r") as f:
         return yaml.safe_load(f)
 
 def process_dataset():
