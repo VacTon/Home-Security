@@ -3,34 +3,29 @@ import numpy as np
 import logging
 import os
 import pickle
-from hailo_platform import VDevice, HEF, ConfigureParams, InferVStreams, InputVStreamParams, OutputVStreamParams
+import onnxruntime as ort
 
 class Recognizer:
     def __init__(self, config):
         self.faces_dir = config["paths"]["faces_dir"]
-        self.model_path = config["paths"].get("recognition_model_path", "models/arcface_mobilefacenet.hef")
+        # Use ONNX model for CPU inference (reliable and fast enough)
+        self.model_path = config["paths"].get("recognition_model_path", "models/w600k_r50.onnx")
         self.tolerance = config["system"]["recognition_tolerance"]
         
         self.known_encodings = []
         self.known_names = []
         
-        # 1. Initialize Hailo Device (Simplified Synchronous API)
-        logging.info(f"Initializing Hailo Recognition: {self.model_path}")
-        self.infer_model = None
+        # Initialize ONNX Runtime (CPU)
+        logging.info(f"Initializing Face Recognition (ONNX/CPU): {self.model_path}")
         try:
-            self.vdevice = VDevice()
-            self.infer_model = self.vdevice.create_infer_model(self.model_path)
-            
-            # Get input/output metadata
-            self.input_name = self.infer_model.input().name
-            self.output_name = self.infer_model.output().name
-            self.input_shape = self.infer_model.input().shape
-            
-            logging.info(f"Hailo Model Loaded. Input: {self.input_name} {self.input_shape}")
-            
+            self.session = ort.InferenceSession(self.model_path, providers=['CPUExecutionProvider'])
+            self.input_name = self.session.get_inputs()[0].name
+            self.output_name = self.session.get_outputs()[0].name
+            input_shape = self.session.get_inputs()[0].shape
+            logging.info(f"Recognition Model Loaded. Input: {input_shape}")
         except Exception as e:
-            logging.error(f"Failed to initialize Hailo: {e}")
-            self.infer_model = None
+            logging.error(f"Failed to load recognition model: {e}")
+            self.session = None
 
         # Standard ArcFace 5-point landmarks (for 112x112)
         self.target_kps = np.array([
@@ -42,8 +37,8 @@ class Recognizer:
         ], dtype=np.float32)
 
     def preprocess(self, img, kpts=None, box=None):
-        """Aligns and prepares face for Hailo."""
-        # 1. Align
+        """Aligns and prepares face for recognition."""
+        # 1. Align face
         if kpts is not None and len(kpts) == 5:
             st = cv2.estimateAffinePartial2D(kpts, self.target_kps, method=cv2.LMEDS)[0]
             face_img = cv2.warpAffine(img, st, (112, 112), borderValue=0.0)
@@ -55,56 +50,34 @@ class Recognizer:
         else:
             return None
 
-        # 2. Format for Hailo (RGB uint8)
+        # 2. Normalize for ONNX model
         face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
-        return face_img.astype(np.uint8)
+        face_img = face_img.astype(np.float32) / 255.0
+        face_img = (face_img - 0.5) / 0.5  # Normalize to [-1, 1]
+        face_img = np.transpose(face_img, (2, 0, 1))  # HWC -> CHW
+        return face_img
 
     def get_embedding(self, img, kpts=None, box=None):
-        if self.infer_model is None:
+        if self.session is None:
             return None
         
         face_blob = self.preprocess(img, kpts, box)
         if face_blob is None:
             return None
             
-        # 3. Hailo Inference (Synchronous - configure each time for stability)
+        # Run ONNX inference
         try:
-            # Prepare input (add batch dimension if needed)
-            input_data = np.ascontiguousarray(face_blob)
-            if len(self.input_shape) == 4:
-                input_data = np.expand_dims(input_data, axis=0)
+            input_data = np.expand_dims(face_blob, axis=0).astype(np.float32)
+            outputs = self.session.run([self.output_name], {self.input_name: input_data})
+            emb = outputs[0][0]
             
-            # Run inference with automatic configuration
-            with self.infer_model.configure() as configured_model:
-                # Create bindings
-                bindings = configured_model.create_bindings()
-                
-                # Prepare output buffer (uint8 to match 512-byte size)
-                output_shape = self.infer_model.output().shape
-                output_buffer = np.ascontiguousarray(np.empty(output_shape, dtype=np.uint8))
-                
-                # Set buffers
-                bindings.input(self.input_name).set_buffer(input_data)
-                bindings.output(self.output_name).set_buffer(output_buffer)
-                
-                # Wait for async ready and run
-                configured_model.wait_for_async_ready(timeout_ms=1000)
-                configured_model.run([bindings], 1000)
-                
-                # Convert to float32
-                emb = output_buffer.astype(np.float32)
-                
-                if np.all(emb == 0):
-                    logging.warning("Hailo returned zeros")
-                    return None
-                
+            # Normalize
+            norm = np.linalg.norm(emb)
+            return (emb / (norm + 1e-10)).reshape(1, -1)
+            
         except Exception as e:
             logging.error(f"Inference failed: {e}")
             return None
-                
-        # 4. Normalize
-        norm = np.linalg.norm(emb)
-        return (emb / (norm + 1e-10)).reshape(1, -1)
 
     def load_known_faces(self):
         logging.info("Loading known faces...")

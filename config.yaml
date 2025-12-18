@@ -20,8 +20,8 @@ paths:
   # Detector Model (YOLOv8-Face ONNX or PT)
   model_path: "models/yolov8n-face.onnx"
   
-  # Recognition Model (ArcFace HEF for Hailo)
-  recognition_model_path: "models/arcface_mobilefacenet.hef"
+  # Recognition Model (ArcFace ONNX for CPU - reliable for presentation)
+  recognition_model_path: "models/w600k_r50.onnx"
   
   # Directory containing subfolders of known faces (CROPPED images recommended)
   faces_dir: "faces"
