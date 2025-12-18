@@ -93,8 +93,8 @@ class Recognizer:
                 bindings.input(self.input_name).set_buffer(input_data)
                 bindings.output(self.output_name).set_buffer(output_buffer)
                 
-                # Execute
-                configured_model.run(bindings, 1000) # 1000ms timeout
+                # Execute (Pass bindings as a LIST)
+                configured_model.run([bindings], 1000) # 1000ms timeout
                 emb = output_buffer.copy()
                 
         except Exception as e:
