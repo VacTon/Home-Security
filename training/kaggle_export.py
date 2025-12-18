@@ -102,38 +102,66 @@ if __name__ == "__main__":
     main()
 """
 
+
 def setup_and_run():
     print("=== Setting up Isolated Environment (Virtual Environment) ===")
-    print("This ensures no conflicts with Kaggle's pre-installed packages.")
     
-    venv_dir = "temp_venv"
+    venv_dir = os.path.abspath("temp_venv")
     
-    # 1. Create Venv if not exists
-    if not os.path.exists(venv_dir):
-        print(f"Creating venv in {venv_dir}...")
-        subprocess.check_call([sys.executable, "-m", "venv", venv_dir])
+    # 1. Create Venv
+    # We use --system-site-packages=False (default) to isolate
+    if os.path.exists(venv_dir):
+        shutil.rmtree(venv_dir)
         
-    # Determine paths
-    if os.name == "nt":
-        pip_cmd = os.path.join(venv_dir, "Scripts", "pip")
-        python_cmd = os.path.join(venv_dir, "Scripts", "python")
-    else:
-        pip_cmd = os.path.join(venv_dir, "bin", "pip")
-        python_cmd = os.path.join(venv_dir, "bin", "python")
+    print(f"Creating venv in {venv_dir}...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "venv", venv_dir])
+    except Exception as e:
+        print(f"Failed to create venv: {e}")
+        return
 
-    # 2. Install dependencies into Venv
-    print("Installing libraries into venv...")
-    # Essential packages only
+    # 2. Determine Python Executable in Venv
+    if os.name == "nt":
+        venv_python = os.path.join(venv_dir, "Scripts", "python.exe")
+    else:
+        # On Linux/Unix, it could be python or python3
+        p1 = os.path.join(venv_dir, "bin", "python")
+        p2 = os.path.join(venv_dir, "bin", "python3")
+        if os.path.exists(p1):
+            venv_python = p1
+        elif os.path.exists(p2):
+            venv_python = p2
+        else:
+            print("Error: Could not find python binary in venv/bin")
+            print(f"Listing {os.path.join(venv_dir, 'bin')}:")
+            try:
+                print(os.listdir(os.path.join(venv_dir, 'bin')))
+            except:
+                print("Could not list bin dir.")
+            return
+
+    print(f"Using venv python: {venv_python}")
+
+    # 3. Install dependencies via 'python -m pip'
+    # This is safer than calling 'pip' directly which might be missing
+    print("Installing libraries...")
     pkgs = ["numpy<2.0", "onnx", "onnxruntime", "ultralytics", "insightface", "scipy"]
-    subprocess.check_call([pip_cmd, "install"] + pkgs)
     
-    # 3. Write Worker Script
-    with open("worker.py", "w") as f:
+    try:
+        subprocess.check_call([venv_python, "-m", "pip", "install", "--upgrade", "pip"])
+        subprocess.check_call([venv_python, "-m", "pip", "install"] + pkgs)
+    except Exception as e:
+        print(f"Failed to install dependencies: {e}")
+        return
+    
+    # 4. Write and Run Worker
+    worker_path = os.path.abspath("worker.py")
+    with open(worker_path, "w") as f:
         f.write(WORKER_SCRIPT)
         
-    # 4. Run Worker with Venv Python
     print("\n=== Launching Worker Script ===")
-    subprocess.check_call([python_cmd, "worker.py"])
+    sys.stdout.flush()
+    subprocess.check_call([venv_python, worker_path])
 
 if __name__ == "__main__":
     setup_and_run()
