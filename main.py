@@ -7,6 +7,7 @@ from camera import Camera
 from detector import Detector
 from recognizer import Recognizer
 from notifier import Notifier
+from visualizer import FaceMeshDrawer
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +25,7 @@ def main():
         detector = Detector(config)
         recognizer = Recognizer(config)
         notifier = Notifier(config)
+        mesh_drawer = FaceMeshDrawer() # Initialize Face Mesh
     except Exception as e:
         logging.error(f"Initialization failed: {e}")
         return
@@ -180,6 +182,14 @@ def main():
                 if kpts is not None:
                     for kp in kpts:
                          cv2.circle(processed_frame, (int(kp[0]), int(kp[1])), 2, (0, 255, 255), -1)
+
+                # --- 3. Draw Face Mesh (Iron Man HUD) ---
+                # We draw this ON TOP of the bounding box
+                # Pass integer coordinates to the visualizer
+                try:
+                    mesh_drawer.process_and_draw(processed_frame, [int(b) for b in box])
+                except Exception as e:
+                    pass # Ignore mesh errors to keep system running
 
             # Update cache at end of frame
             if do_recognition:
