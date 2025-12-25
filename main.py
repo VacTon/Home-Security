@@ -167,7 +167,38 @@ def main():
                     if best:
                         name, conf = best['name'], best['conf']
 
-                tracked_faces.append({'center': (cx, cy), 'name': name, 'conf': conf})
+                tracked_faces.append({'center': (cx, cy), 'name': name, 'conf': conf, 'box': box})
+            
+            # === DEDUPLICATION: Ensure no two faces have the same identity ===
+            # Build a map of name -> list of faces claiming that name
+            name_claims = {}
+            for face in tracked_faces:
+                face_name = face['name']
+                if face_name not in ["Unknown", "Verifying...", "..."]:
+                    if face_name not in name_claims:
+                        name_claims[face_name] = []
+                    name_claims[face_name].append(face)
+            
+            # Resolve conflicts: keep highest confidence, demote others
+            for claimed_name, claimants in name_claims.items():
+                if len(claimants) > 1:
+                    # Sort by confidence (descending)
+                    claimants.sort(key=lambda f: f['conf'], reverse=True)
+                    
+                    # Winner keeps the name
+                    winner = claimants[0]
+                    
+                    # Losers become Unknown
+                    for loser in claimants[1:]:
+                        loser['name'] = "Unknown"
+                        loser['conf'] = 0.0
+                        logging.info(f"Deduplication: Demoted duplicate '{claimed_name}' (conf={loser['conf']:.2f}) to Unknown")
+            
+            # === DRAWING & ALERTS (using deduplicated data) ===
+            for face in tracked_faces:
+                name = face['name']
+                conf = face['conf']
+                box = face['box']
                 
                 # Drawing
                 color = (0, 255, 0)
@@ -185,6 +216,7 @@ def main():
                 except Exception as e:
                     pass
 
+                # Stranger Alert
                 if name == "Unknown" and (time.time() - last_stranger_shot) > stranger_cooldown:
                     timestamp = time.strftime("%Y%m%d_%H%M%S")
                     filename = f"{stranger_dir}/stranger_{timestamp}.jpg"
@@ -193,6 +225,7 @@ def main():
                     cv2.imwrite(filename, snap)
                     notifier.notify("Unknown", image_path=filename)
                     last_stranger_shot = time.time()
+
             
             t3 = time.time()
             
