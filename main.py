@@ -192,7 +192,7 @@ def main():
                     cv2.rectangle(snap, (x1, y1), (x2, y2), (0, 0, 255), 2)
                     cv2.imwrite(filename, snap)
                     notifier.notify("Unknown", image_path=filename)
-                    last_stranger_shot = now
+                    last_stranger_shot = time.time()
             
             t3 = time.time()
             
