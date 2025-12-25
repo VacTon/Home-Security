@@ -2,7 +2,7 @@
 
 system:
   confidence_threshold: 0.5
-  recognition_tolerance: 0.5  # Standard ArcFace threshold (0.4 - 0.6)
+  recognition_tolerance: 0.40  # Lowered for MediaPipe alignment
   frame_width: 640
   frame_height: 480
 
