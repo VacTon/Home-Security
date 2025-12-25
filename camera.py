@@ -50,7 +50,11 @@ class Camera:
         """Reads a frame from the camera."""
         if self.use_picam and self.picam2:
             # Capture directly to numpy array (very fast)
-            return self.picam2.capture_array()
+            # Capture directly to numpy array
+            frame = self.picam2.capture_array()
+            # Picamera2 'BGR888' sometimes returns RGB on Pi 5 / libcamera versions.
+            # We swap it manually to ensure OpenCV compatibility (BGR)
+            return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             
         if self.cap:
             ret, frame = self.cap.read()
