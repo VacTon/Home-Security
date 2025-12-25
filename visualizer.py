@@ -53,11 +53,12 @@ class FaceMeshDrawer:
                     # (Standard mediapipe utils can't map ROI -> Global easily)
                     
                     # Optimization: Only draw connections (lines), skip dots
+                    # Optimization: Use CONTOURS (less lines) instead of TESSELATION
                     mp.solutions.drawing_utils.draw_landmarks(
-                        image=frame[py1:py2, px1:px2], # Draw directly on the ROI slice of the main frame
+                        image=frame[py1:py2, px1:px2],
                         landmark_list=face_landmarks,
-                        connections=self.mp_face_mesh.FACEMESH_TESSELATION, 
-                        landmark_drawing_spec=None, # Skip dots for speed
+                        connections=self.mp_face_mesh.FACEMESH_CONTOURS, 
+                        landmark_drawing_spec=None, 
                         connection_drawing_spec=self.connection_style
                     )
                     
