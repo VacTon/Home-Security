@@ -1,69 +1,81 @@
-# Project Progress Report: Home Security Phase 2
-**Project:** Raspberry Pi 5 AI Security System  
+# WEEKLY PROGRESS REPORT
+
+**Project Title:** Advanced Home Security System using Raspberry Pi 5 & Edge AI  
+**Team:** VacTon (Bao, Phat)  
 **Date:** December 25, 2025  
-**Topic:** Face Mesh Integration & Custom Model Research
+**Report ID:** Phase 2 - Visualization & Model Research
 
 ---
 
-## 1. Executive Summary
-This week focused on elevating the User Interface (UI) and exploring the boundaries of Edge AI training. We successfully implemented a real-time **"Iron Man" Face Mesh** visualization, adding a futuristic HUD overlay.
-
-Simultaneously, we undertook an ambitious Research & Development (R&D) initiative to train a **Custom Face Recognition Model** from scratch using Kaggle GPUs. While the training pipeline was successfully built, empirical testing revealed the **"Data Scarcity Principle,"** validating that pre-trained large-scale models outperform custom models trained on small datasets.
-
----
-
-## 2. Key Achievements
-
-### A. Real-Time Face Mesh (The "Iron Man" HUD)
-We integrated Google's **MediaPipe Face Mesh** into the security feed.
-*   **Optimization:** Implemented a "Region of Interest" (ROI) strategy to crop strictly around the detected face, allowing the mesh to run at **20+ FPS** on the Raspberry Pi 5.
-*   **Visualization:** Designed a custom wireframe overlay (Cyan/Teal) to distinguish the secure system from standard bounding boxes.
-*   **Outcome:** The system now looks premium and futuristic, meeting the "Wow Factor" requirement.
-
-### B. Automated Dataset Curation (The "Smart Cleaner")
-To support custom training, we developed a novel tool (`tools/clean_dataset.py`) that uses Face Mesh geometry to:
-1.  **Calculate Yaw/Pitch:** Automatically reject profile shots (looking sideways).
-2.  **Detect Blur:** Reject low-quality frames.
-3.  **Auto-Align:** Rotationally correct faces based on eye calibration.
-*   **Outcome:** We transformed a raw, noisy dataset into a "Golden Dataset" suitable for machine learning.
-
-### C. End-to-End Training Pipeline
-We successfully built and executed widespread industry training workflows on **Kaggle**:
-*   **Architecture 1:** Triplet Loss (FaceNet style).
-*   **Architecture 2:** ArcFace (State-of-the-Art discrimination).
-*   **Deployment:** Successfully exported specialized `.onnx` models and deployed them to the edge device.
+## 1. Objectives for this Week
+*   Enhance the User Interface (UI) with real-time biometric visualization ("Face Mesh").
+*   Investigate the feasibility of training a custom Face Recognition model to replace the pre-trained ArcFace solution.
+*   Implement an end-to-end data pipeline: Data Collection -> Cleaning -> Training -> Deployment.
 
 ---
 
-## 3. The "Deep Learning Reality Check" (Lessons Learned)
+## 2. Work Completed
 
-The primary goal of the R&D phase was to see if a custom-trained model could outperform the generic pre-trained model.
+### 2.1 UI/UX Enhancement: Face Mesh Integration
+*   **Objective:** Create a futuristic "Iron Man HUD" feel to improve the aesthetic value of the product.
+*   **Implementation:** 
+    *   Integrated `MediaPipe Face Mesh` (468 landmarks) into the main video loop.
+    *   developed `visualizer.py` to handle drawing logic separately from the detection core.
+*   **Optimization Strategy:**
+    *   Implemented a **Region of Interest (ROI)** cropping mechanism.
+    *   Instead of processing the full 1080p frame, we crop only the bounding box of the face, run the mesh, and project it back.
+    *   **Result:** Maintained system stability with acceptable FPS on the Raspberry Pi 5.
 
-**The Experiment:**
-*   **Model A (Pre-trained):** Trained on MS1MV3 (5.8 Million Images, 93k Identities).
-*   **Model B (Custom):** Trained on Home Dataset (~100 Images, 3-4 Identities).
-
-**The Result:**
-Model A (Pre-trained) significantly outperformed Model B.
-
-**The "Educational Win":**
-We learned a fundamental truth of Modern AI: **Data is King.**
-*   Deep Learning models require massive variability (lighting, ethnicity, age, texture) to learn the abstract concept of "What makes a face unique?"
-*   Training on a small dataset leads to **Overfitting** (memorizing the specific training photos) rather than **Generalization** (recognizing the person in new conditions).
-
-While the custom model "worked" (it learned!), it lacked the robust invariance of the Google-scale pre-trained model.
-
----
-
-## 4. Strategic Decision
-**Decision:** Revert to the **Pre-trained ArcFace Model (w600k_r50.onnx)**.
-
-**Rationale:**
-1.  **Security First:** Accuracy is the paramount metric for a security system.
-2.  **Best of Both Worlds:** We keep the visual enhancements (Face Mesh) and the data cleaning tools, but we power the recognition engine with the SOTA weights.
+### 2.2 R&D: Custom Model Training (The "Deep Learning Experiment")
+*   **Objective:** Train a lightweight model (MobileNetV2/MobileFaceNet) on our specific home users to potentially improve speed/accuracy.
+*   **Workflow:**
+    1.  **Data Collection:** Gathered ~100 photos of team members.
+    2.  **Data Cleaning:** Developed `tools/clean_dataset.py` which uses geometric analysis (Yaw/Pitch) to auto-reject bad angles and blurry photos.
+    3.  **Training:** Utilized Kaggle GPUs to train two architectures:
+        *   *Triplet Loss* (FaceNet approach).
+        *   *ArcFace Loss* (Angular Margin approach).
+    4.  **Deployment:** Exported models to ONNX and integrated them into the `recognizer.py` module.
 
 ---
 
-## 5. Next Steps
-1.  **Hardware Acceleration:** Move the Pre-trained model inference to the **Hailo-8L NPU** (if available) to boost FPS for the heavy ArcFace model.
-2.  **Final Presentation:** Prepare the live demo script.
+## 3. Results & Analysis (The "Educational Win")
+
+### 3.1 Face Mesh Success
+The visualization layer works perfectly. The **Cyan Wireframe Overlay** accurately tracks facial movements (blinking, talking) in real-time, significantly boosting the "Wow Factor" for the final presentation.
+
+### 3.2 Deep Learning Reality Check
+We conducted a comparative analysis between our **Custom Trained Model** and the **Pre-trained ArcFace Model**.
+
+| Metric | Pre-trained Model (Google/InsightFace) | Custom Model (Ours) |
+| :--- | :--- | :--- |
+| **Training Data** | 5.8 Million Images (MS1MV3) | ~100 Images (Home Data) |
+| **Robustness** | High (Works in dark, angles, glasses) | Low (Overfits to specific lighting) |
+| **Conclusion** | **Superior** | **Inferior** |
+
+**Key Lesson Learned:**
+Modern Face Recognition relies heavily on **Generalization**. A model trained on millions of faces learns the *abstract concept* of facial structure (how shadows fall on a nose, how eyes differ). A model trained on 50 photos merely "memorizes" those specific pixels. 
+
+**Strategic Decision:**
+We have decided to **revert to the Pre-trained ArcFace Model** for the production deployment. This ensures maximum security and accuracy, while we keep the Face Mesh and Data Cleaning tools as valuable R&D artifacts.
+
+---
+
+## 4. Challenges Encountered & Solutions
+
+| Challenge | Impact | Solution |
+| :--- | :--- | :--- |
+| **Low FPS with Mesh** | System dropped to <5 FPS. | Implemented ROI Cropping (Face-only processing) to boost speed. |
+| **"Blue Face" Bug** | Recognition failed; video looked blue. | Identified RGB/BGR mismatch in `camera.py`. Added manual channel swapping. |
+| **Custom Model Inaccuracy** | High False Rejection Rate. | Analyzed "Small Data" problem. Reverted to Pre-trained SOTA weights. |
+
+---
+
+## 5. Plan for Next Week
+*   **Final System Polish:** Ensure the system runs stable for 24+ hours.
+*   **Presentation Prep:** Rehearse the live demo using the Face Mesh visualization.
+*   **Documentation:** Finalize the "User Manual" and Architecture diagrams.
+
+---
+
+**Sign-off:**  
+*Status: On Track for Final Presentation.*
