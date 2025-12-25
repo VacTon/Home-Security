@@ -121,9 +121,4 @@ class Recognizer:
              
         return "Unknown", float(best_sim)
 
-    def __del__(self):
-        # Cleanup device
-        if hasattr(self, 'vdevice') and self.vdevice:
-            # VDevice doesn't always need explicit close in some python wrappers,
-            # but it is good practice.
-            pass
+

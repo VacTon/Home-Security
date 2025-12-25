@@ -45,7 +45,7 @@ def process_dataset():
     detector = Detector(config)
     recognizer = Recognizer(config)
 
-    raw_dir = "Home_Owners" # User puts photos here
+    raw_dir = "faces" # User photos are here
     output_file = os.path.join(config["paths"]["faces_dir"], "encodings.pkl")
     
     if not os.path.exists(raw_dir):

@@ -73,4 +73,4 @@ class FaceMeshDrawer:
 
         except Exception as e:
             # Don't crash the whole security system if mesh fails
-            print(f"Mesh Error: {e}")
+            pass
