@@ -2,7 +2,7 @@
 
 system:
   confidence_threshold: 0.5
-  recognition_tolerance: 0.4  # Cosine Similarity threshold (Higher is stricter, e.g. 0.3-0.5)
+  recognition_tolerance: 0.5  # Standard ArcFace threshold (0.4 - 0.6)
   frame_width: 640
   frame_height: 480
 
@@ -17,7 +17,7 @@ paths:
   # Detector Model (YOLOv8-Face ONNX or PT)
   model_path: "models/yolov8n-face.onnx"
   
-  # Recognition Model (ArcFace ONNX for CPU - reliable for presentation)
+  # Recognition Model (Pre-trained ArcFace - High Accuracy)
   recognition_model_path: "models/w600k_r50.onnx"
   
   # Directory containing subfolders of known faces (CROPPED images recommended)
