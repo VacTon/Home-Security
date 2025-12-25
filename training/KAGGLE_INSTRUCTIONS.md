@@ -5,8 +5,12 @@ This guide explains how to use the `kaggle_arcface_script.py` to train a custom 
 ## Step 1: Prepare Your Data
 
 1.  **Collect Photos:** Organized in folders by person (e.g., `dataset/Person1`, `dataset/Person2`).
-2.  **Add a Public Dataset:** Since Deep Learning needs thousands of faces to learn *generic* facial features, you should mix your small dataset with a public one like **WiderFace** or **LFW** (Labeled Faces in the Wild).
-3.  **Zip It:** Compress your `dataset` folder into `dataset.zip`.
+2.  **CLEAN YOUR DATA (New & Recommended):**
+    *   We added a smart tool to auto-remove blurry or bad-angle photos.
+    *   Run: `python tools/clean_dataset.py`
+    *   Use the generated `dataset_for_kaggle` folder for the next step.
+3.  **Add a Public Dataset:** Since Deep Learning needs thousands of faces to learn *generic* facial features, you should mix your small dataset with a public one like **WiderFace** or **LFW** (Labeled Faces in the Wild).
+4.  **Zip It:** Compress your `dataset_for_kaggle` folder into `dataset.zip`.
 
 ## Step 2: Set Up Kaggle
 
