@@ -188,11 +188,12 @@ def main():
                     # Winner keeps the name
                     winner = claimants[0]
                     
-                    # Losers become Unknown
+                    # Losers become Unknown (but keep their confidence for tracking stability)
                     for loser in claimants[1:]:
+                        original_conf = loser['conf']
                         loser['name'] = "Unknown"
-                        loser['conf'] = 0.0
-                        logging.info(f"Deduplication: Demoted duplicate '{claimed_name}' (conf={loser['conf']:.2f}) to Unknown")
+                        # Keep confidence for tracking, but it's now an "Unknown" match
+                        logging.info(f"Deduplication: Demoted duplicate '{claimed_name}' (conf={original_conf:.2f}) to Unknown")
             
             # === DRAWING & ALERTS (using deduplicated data) ===
             for face in tracked_faces:
