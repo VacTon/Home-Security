@@ -25,114 +25,101 @@ VII. REFERENCES
 
 ## I. ABSTRACT / PROJECT OVERVIEW
 
-Team VacTon successfully developed a production-ready AI-powered home security system that achieves **20 FPS real-time performance** on Raspberry Pi 5 hardware. The system features a futuristic **Face Mesh visualization** ("Iron Man HUD"), **multi-person face recognition** with identity deduplication, and **instant Telegram alerts** for unauthorized access. 
-
-Through systematic optimization, we replaced the initial YOLO detector with MediaPipe (achieving 50x speed improvement), implemented threaded architecture for concurrent processing, and added intelligent identity conflict resolution. The final system demonstrates that edge AI can deliver both visual sophistication and computational efficiency when properly architected.
+Team VacTon developed a real-time face recognition security system running on Raspberry Pi 5. The system detects faces using MediaPipe, identifies authorized users with ArcFace recognition, and sends Telegram alerts when strangers are detected. We implemented a Face Mesh visualization overlay and achieved 18-20 FPS performance through systematic optimization including detector replacement, threaded recognition, and ROI-based processing.
 
 ---
 
 ## II. COMPLETED TASKS (What we did)
 
-**1. Face Mesh Integration (Visualization Layer)**
+**1. Face Detection System**
 *   **Member(s):** All
-*   **Description:** Integrated Google MediaPipe Face Mesh (468 landmarks) to overlay a cyan wireframe on detected faces, creating a "cyberpunk" aesthetic.
-*   **Outcome:** Real-time 3D head tracking with optimized ROI processing to maintain performance.
+*   **Description:** Implemented MediaPipe Face Detection to locate faces in video feed. Replaced initial YOLO implementation with MediaPipe for better CPU performance.
+*   **Outcome:** Detection runs at 8-10ms per frame, enabling real-time processing.
 
-**2. Performance Optimization (Multi-Stage)**
+**2. Face Recognition with ArcFace**
 *   **Member(s):** All
-*   **Description:** Systematic optimization through three major iterations:
-    *   **Stage 1:** ROI Cropping - Process only detected face regions instead of full frame
-    *   **Stage 2:** Threading Architecture - Moved ArcFace recognition to background thread
-    *   **Stage 3:** Detector Replacement - Switched from YOLO (550ms) to MediaPipe (10ms)
-*   **Outcome:** Achieved **18-20 FPS** with all features enabled (detection + recognition + mesh).
+*   **Description:** Integrated pre-trained ArcFace model (w600k_r50.onnx) for face identification. Implemented embedding comparison with configurable confidence threshold (0.40).
+*   **Outcome:** Accurate recognition of registered users with 512-dimensional face embeddings.
 
-**3. Identity Deduplication System**
+**3. Face Mesh Visualization**
 *   **Member(s):** All
-*   **Description:** Implemented conflict resolution logic to prevent multiple faces from being assigned the same identity. When conflicts occur, the highest confidence match retains the identity while others are marked as "Unknown".
-*   **Outcome:** Eliminated false positives in multi-person scenarios, ensuring each home owner identity is unique per frame.
+*   **Description:** Added MediaPipe Face Mesh to draw wireframe overlay on detected faces, including contour lines and nose crosshair marker.
+*   **Outcome:** Visual feedback showing system is actively tracking faces.
 
-**4. Data Collection & Processing Tools**
+**4. Performance Optimization**
 *   **Member(s):** All
-*   **Description:** Created `tools/add_user.py` for automated burst capture (150 photos) and `tools/clean_dataset.py` for geometry-based quality filtering.
-*   **Outcome:** Streamlined user onboarding process from manual photo collection to automated 10-second capture session.
+*   **Description:** Implemented three optimization strategies:
+    *   Replaced YOLO detector (550ms) with MediaPipe (10ms)
+    *   Added ROI cropping for Face Mesh processing
+    *   Moved recognition to background thread (AsyncRecognizer class)
+*   **Outcome:** Improved from 3-4 FPS to 18-20 FPS with all features enabled.
 
-**5. Custom Model Training R&D**
+**5. Identity Deduplication**
 *   **Member(s):** All
-*   **Description:** Built complete training pipeline on Kaggle using PyTorch, trained both ArcFace and Triplet Loss architectures from scratch.
-*   **Outcome:** Validated that pre-trained models (5.8M images) outperform custom models (100 images) for security applications. Educational success demonstrating data-centric AI principles.
+*   **Description:** Added logic to prevent multiple faces from being assigned the same identity. When conflicts occur, highest confidence match keeps the identity, others marked as "Unknown".
+*   **Outcome:** Eliminated false positives in multi-person scenarios.
 
-**6. System Deployment Configuration**
+**6. Telegram Notifications**
 *   **Member(s):** All
-*   **Description:** Configured multi-network WiFi support for seamless demo deployment, enabling automatic connection to mobile hotspot or home network.
-*   **Outcome:** Production-ready system that can operate in classroom environment without reconfiguration.
+*   **Description:** Integrated Telegram bot to send alerts with photos when strangers are detected. Includes 10-second cooldown to prevent spam.
+*   **Outcome:** Real-time alerts to home owner's phone.
+
+**7. Data Collection Tools**
+*   **Member(s):** All
+*   **Description:** Created `tools/add_user.py` for automated photo capture (150 images in burst mode) and `tools/process_database.py` for embedding generation.
+*   **Outcome:** Simplified user registration process.
+
+**8. WiFi Configuration**
+*   **Member(s):** All
+*   **Description:** Configured NetworkManager to support multiple WiFi networks (home + mobile hotspot) for classroom demo.
+*   **Outcome:** System can connect to available network automatically.
 
 ---
 
 ## III. IN-PROGRESS / ONGOING TASKS
 
-**1. Hailo-8L NPU Integration**
-*   **Member(s):** [Name 1]
-*   **Status:** Research Phase (60% Complete)
-*   **Description:** Investigating hardware acceleration for detection model to push FPS beyond 30.
-*   **Note:** Current CPU-optimized MediaPipe solution already meets performance requirements.
-
-**2. Final Presentation Rehearsal**
-*   **Member(s):** All
-*   **Status:** 90% Complete
-*   **Description:** Practiced live demo transitions, prepared backup scenarios, tested mobile hotspot connectivity.
+None - all planned features are implemented and functional.
 
 ---
 
 ## IV. OUTCOMES & ACHIEVEMENTS
 
-**1. Real-Time Multi-Model AI Pipeline**
-Successfully orchestrated three concurrent AI models (MediaPipe Detection, ArcFace Recognition, Face Mesh Visualization) on edge hardware, achieving 20 FPS through architectural optimization rather than hardware acceleration.
+**1. Real-Time Performance**
+Achieved 18-20 FPS with three concurrent AI models (detection, recognition, mesh visualization) running on Raspberry Pi 5 CPU.
 
-**2. Production-Grade Identity Management**
-Implemented enterprise-level features including:
-- Identity deduplication (no duplicate names)
-- Confidence-based conflict resolution
-- Temporal tracking for smooth transitions
-- Stranger detection with cooldown logic
+**2. Identity Management**
+Implemented deduplication system ensuring each identity appears only once per frame, preventing confusion in multi-person scenarios.
 
-**3. Developer-Friendly Tooling**
-Created reusable utilities:
-- `add_user.py`: Automated data collection (150 photos in 10 seconds)
-- `clean_dataset.py`: Geometry-based quality filtering using Face Mesh
-- `process_database.py`: One-command embedding generation
+**3. User-Friendly Tools**
+Created automated data collection (`add_user.py`) reducing registration from manual photo taking to 10-second capture session.
 
-**4. Educational Deep Learning Insights**
-Through custom model training experiments, we empirically validated the "data-centric AI" principle: **model architecture matters less than training data quality and quantity**. Our custom models (100 images) achieved 65% accuracy while pre-trained models (5.8M images) achieved 95% accuracy.
+**4. Production Deployment**
+Configured multi-network WiFi support enabling demo in classroom environment without reconfiguration.
 
 **5. Performance Metrics**
-- **FPS:** 18-20 (3 people), 25+ (1 person)
-- **Detection Latency:** 8-10ms (MediaPipe)
-- **Recognition Latency:** 150ms (background thread, non-blocking)
-- **Mesh Rendering:** 30ms per face
+- Detection: 8-10ms (MediaPipe)
+- Recognition: 150ms (background thread)
+- Mesh rendering: 30ms per face
+- Overall FPS: 18-20 (single person), 11-15 (3 people)
 
 ---
 
 ## V. CHALLENGES, RISKS & MITIGATION
 
-**Challenge 1: Frame Rate Bottleneck**
-*   **Risk:** Initial implementation achieved only 3-4 FPS, making the system unusable.
-*   **Root Cause:** YOLO detection consumed 550ms per frame.
-*   **Mitigation:** Replaced YOLO with MediaPipe (10ms), achieving 50x speedup. Lesson: Choose models optimized for target hardware.
+**Challenge 1: Low Frame Rate**
+*   **Problem:** Initial implementation achieved only 3-4 FPS.
+*   **Cause:** YOLO detector consumed 550ms per frame.
+*   **Solution:** Replaced with MediaPipe detector (10ms), achieving 50x speedup.
 
 **Challenge 2: Identity Flickering**
-*   **Risk:** Faces would randomly switch between different identities frame-to-frame.
-*   **Root Cause:** Tracking system lost identity when confidence was reset to 0.0 during deduplication.
-*   **Mitigation:** Preserved original confidence scores while changing name to "Unknown", maintaining tracking stability.
+*   **Problem:** Face identities would change randomly between frames.
+*   **Cause:** Tracking system lost identity when confidence was reset during deduplication.
+*   **Solution:** Preserved confidence scores while changing name to "Unknown".
 
-**Challenge 3: False Positives (Duplicate Names)**
-*   **Risk:** Similar-looking people would both be recognized as the same person.
-*   **Root Cause:** Low recognition threshold (0.40) allowed weak matches.
-*   **Mitigation:** Implemented deduplication system that resolves conflicts by confidence ranking.
-
-**Challenge 4: Custom Model Underperformance**
-*   **Risk:** Invested significant time in custom training but achieved poor results.
-*   **Root Cause:** Insufficient training data (100 images vs. 5.8M for pre-trained).
-*   **Mitigation:** Pivoted to pre-trained model. Lesson: Data quantity trumps model complexity for face recognition.
+**Challenge 3: Duplicate Identities**
+*   **Problem:** Two people could be labeled with same name.
+*   **Cause:** Similar-looking people both matched same identity above threshold.
+*   **Solution:** Implemented deduplication logic keeping highest confidence match.
 
 ---
 
@@ -140,16 +127,13 @@ Through custom model training experiments, we empirically validated the "data-ce
 
 | Task | Responsible | Deliverable |
 | :--- | :--- | :--- |
-| **Live Demo Execution** | All | Successful classroom presentation with mobile hotspot |
-| **Performance Documentation** | [Name 1] | FPS benchmarks across different scenarios |
-| **Code Documentation** | [Name 2] | Inline comments and README updates |
-| **Future Roadmap** | [Name 3] | Hailo NPU integration plan, cloud storage options |
+| **Live Demo Execution** | All | Successful classroom presentation |
+| **Performance Documentation** | All | FPS measurements across scenarios |
+| **Code Cleanup** | All | Remove unused files, add comments |
 
 ---
 
 ## VII. REFERENCES
 
 1. Deng, J., Guo, J., Xue, N., & Zafeiriou, S. (2019). *ArcFace: Additive Angular Margin Loss for Deep Face Recognition*. CVPR.
-2. GoogleAI. (2020). *MediaPipe Face Mesh*. GitHub. https://github.com/google/mediapipe
-3. Lugaresi, C., et al. (2019). *MediaPipe: A Framework for Building Perception Pipelines*. arXiv:1906.08172.
-4. Schroff, F., Kalenichenko, D., & Philbin, J. (2015). *FaceNet: A Unified Embedding for Face Recognition and Clustering*. CVPR.
+2. Lugaresi, C., et al. (2019). *MediaPipe: A Framework for Building Perception Pipelines*. arXiv:1906.08172.
