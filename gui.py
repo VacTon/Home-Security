@@ -20,12 +20,12 @@ class SecuritySystemGUI:
         # Current view tracking
         self.current_view = "controls"  # controls, files, database
         
-        # Configure colors - Red theme
-        self.bg_color = "#1a0000"  # Dark red background
+        # Configure colors - Cyan/Blue theme
+        self.bg_color = "#1b1b1b"  # Dark background
         self.fg_color = "#000000"  # Black text
-        self.accent_color = "#cc0000"  # Bright red
-        self.button_bg = "#ff3333"  # Red button
-        self.button_active = "#ff6666"  # Lighter red on hover
+        self.accent_color = "#00ffff"  # Cyan
+        self.button_bg = "#b2ffff"  # Light cyan button
+        self.button_active = "#87ceeb"  # Sky blue on hover
         self.text_color = "#000000"  # Black text
         
         # Configure root background
@@ -68,10 +68,10 @@ class SecuritySystemGUI:
         main_frame.rowconfigure(2, weight=1)
         
         # Title
-        title_label = tk.Label(main_frame, text="🏠 AI Security System", 
+        title_label = tk.Label(main_frame, text="Home Security System", 
                               font=('Arial', 24, 'bold'),
                               bg=self.bg_color,
-                              fg='#ffffff')
+                              fg='#00ffff')  # Cyan
         title_label.grid(row=0, column=0, pady=15)
         
         # Control Buttons Frame (will be swapped)
