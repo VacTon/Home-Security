@@ -60,7 +60,19 @@ def add_new_user():
             
         print("\nCapture Complete!")
         print(f"Saved {count} photos to {save_dir}")
-        print("Don't forget to run: python tools/process_database.py")
+        
+        # Automatically process database
+        print("\n=== PROCESSING DATABASE ===")
+        print("Generating face embeddings...")
+        
+        try:
+            # Import and run process_database
+            from process_database import process_dataset
+            process_dataset()
+            print(f"\n✓ User '{name}' is now registered and ready for recognition.")
+        except Exception as e:
+            print(f"\n✗ Error processing database: {e}")
+            print("You can manually run: python tools/process_database.py")
 
     except Exception as e:
         print(f"Error: {e}")

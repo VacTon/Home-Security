@@ -54,10 +54,10 @@ class SecuritySystemGUI:
         self.stop_btn.grid(row=0, column=1, padx=5, pady=5)
         
         # Row 2: User management
-        ttk.Button(control_frame, text="👤 Add New User", 
+        ttk.Button(control_frame, text="👤 Add New User (Auto-Process)", 
                   command=self.add_user, width=btn_width).grid(row=1, column=0, padx=5, pady=5)
         
-        ttk.Button(control_frame, text="🔄 Process Database", 
+        ttk.Button(control_frame, text="🔄 Rebuild Database", 
                   command=self.process_database, width=btn_width).grid(row=1, column=1, padx=5, pady=5)
         
         # Row 3: Utilities
