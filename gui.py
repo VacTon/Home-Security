@@ -159,13 +159,13 @@ class SecuritySystemGUI:
         btn_width = 20
         
         # Edit Config button
-        ttk.Button(self.control_frame, text="⚙️ Edit Config", 
+        ttk.Button(self.control_frame, text="Edit Config", 
                   command=self.edit_config, 
                   width=btn_width,
                   style='Red.TButton').grid(row=0, column=0, pady=10)
         
         # System Info button
-        ttk.Button(self.control_frame, text="📊 System Info", 
+        ttk.Button(self.control_frame, text="System Info", 
                   command=self.show_system_info, 
                   width=btn_width,
                   style='Red.TButton').grid(row=1, column=0, pady=5)
@@ -185,19 +185,19 @@ class SecuritySystemGUI:
         btn_width = 20
         
         # Add Home Owner button
-        ttk.Button(self.control_frame, text="👤 Add New Home Owner", 
+        ttk.Button(self.control_frame, text="Add New Home Owner", 
                   command=self.add_user, 
                   width=btn_width,
                   style='Red.TButton').grid(row=0, column=0, pady=10)
         
         # Open Faces Folder button
-        ttk.Button(self.control_frame, text="📁 Open Faces Folder", 
+        ttk.Button(self.control_frame, text="Open Faces Folder", 
                   command=self.open_faces_folder, 
                   width=btn_width,
                   style='Red.TButton').grid(row=1, column=0, pady=5)
         
         # Open Strangers Folder button
-        ttk.Button(self.control_frame, text="📸 Open Strangers Folder", 
+        ttk.Button(self.control_frame, text="Open Strangers Folder", 
                   command=self.open_strangers_folder, 
                   width=btn_width,
                   style='Red.TButton').grid(row=2, column=0, pady=5)
