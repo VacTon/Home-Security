@@ -48,12 +48,13 @@ class SecuritySystemGUI:
         # Configure label frame style
         style.configure('Red.TLabelframe',
                        background=self.bg_color,
-                       foreground='#ffffff',
+                       foreground='#00ffff',  # Cyan to match title
                        borderwidth=2,
+                       bordercolor='#00ffff',  # Cyan border
                        relief='solid')
         style.configure('Red.TLabelframe.Label',
                        background=self.bg_color,
-                       foreground='#ffffff',
+                       foreground='#00ffff',  # Cyan to match title
                        font=('Arial', 11, 'bold'))
         
         # Create main container
