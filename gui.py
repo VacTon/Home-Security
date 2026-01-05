@@ -139,13 +139,13 @@ class SecuritySystemGUI:
         self.toggle_btn.grid(row=0, column=0, pady=10)
         
         # Files button
-        ttk.Button(self.control_frame, text="📁 Files", 
+        ttk.Button(self.control_frame, text="Files", 
                   command=self.show_files_view, 
                   width=btn_width,
                   style='Red.TButton').grid(row=1, column=0, pady=5)
         
         # Database button
-        ttk.Button(self.control_frame, text="💾 Database", 
+        ttk.Button(self.control_frame, text="Database", 
                   command=self.show_database_view, 
                   width=btn_width,
                   style='Red.TButton').grid(row=2, column=0, pady=5)
