@@ -17,6 +17,9 @@ class SecuritySystemGUI:
         self.main_process = None
         self.is_running = False
         
+        # Current view tracking
+        self.current_view = "controls"  # controls, files, database
+        
         # Configure colors - Red theme
         self.bg_color = "#1a0000"  # Dark red background
         self.fg_color = "#000000"  # Black text
@@ -70,43 +73,11 @@ class SecuritySystemGUI:
                               fg='#ffffff')
         title_label.grid(row=0, column=0, pady=15)
         
-        # Control Buttons Frame
-        control_frame = ttk.LabelFrame(main_frame, text="System Controls", 
-                                      padding="15", style='Red.TLabelframe')
-        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=10)
-        
-        # Button width
-        btn_width = 25
-        
-        # Row 1: Combined Start/Stop button
-        self.toggle_btn = ttk.Button(control_frame, text="▶ Start System", 
-                                    command=self.toggle_system, 
-                                    width=btn_width,
-                                    style='Red.TButton')
-        self.toggle_btn.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
-        
-        # Row 2: User management
-        ttk.Button(control_frame, text="👤 Add New Home Owner", 
-                  command=self.add_user, width=btn_width,
-                  style='Red.TButton').grid(row=1, column=0, padx=5, pady=5)
-        
-        ttk.Button(control_frame, text="📁 Open Faces Folder", 
-                  command=self.open_faces_folder, width=btn_width,
-                  style='Red.TButton').grid(row=1, column=1, padx=5, pady=5)
-        
-        # Row 3: Utilities
-        ttk.Button(control_frame, text="📸 Open Strangers Folder", 
-                  command=self.open_strangers_folder, width=btn_width,
-                  style='Red.TButton').grid(row=2, column=0, padx=5, pady=5)
-        
-        ttk.Button(control_frame, text="⚙️ Edit Config", 
-                  command=self.edit_config, width=btn_width,
-                  style='Red.TButton').grid(row=2, column=1, padx=5, pady=5)
-        
-        # Row 4: Info
-        ttk.Button(control_frame, text="📊 System Info", 
-                  command=self.show_system_info, width=btn_width,
-                  style='Red.TButton').grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+        # Control Buttons Frame (will be swapped)
+        self.control_frame = ttk.LabelFrame(main_frame, text="System Controls", 
+                                           padding="15", style='Red.TLabelframe')
+        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=10)
+        self.control_frame.columnconfigure(0, weight=1)
         
         # Status Frame
         status_frame = ttk.LabelFrame(main_frame, text="System Status", 
@@ -136,12 +107,105 @@ class SecuritySystemGUI:
                               style='Red.TButton')
         clear_btn.grid(row=2, column=0, pady=5)
         
+        # Show initial view
+        self.show_controls_view()
+        
         # Initial log message
         self.log("Security System Control Panel initialized")
         self.log("Ready to start")
         
         # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+    
+    def clear_control_frame(self):
+        """Clear all widgets from control frame"""
+        for widget in self.control_frame.winfo_children():
+            widget.destroy()
+    
+    def show_controls_view(self):
+        """Show main controls view"""
+        self.current_view = "controls"
+        self.clear_control_frame()
+        self.control_frame.config(text="System Controls")
+        
+        btn_width = 20
+        
+        # Start/Stop button (centered)
+        self.toggle_btn = ttk.Button(self.control_frame, text="▶ Start System", 
+                                    command=self.toggle_system, 
+                                    width=btn_width,
+                                    style='Red.TButton')
+        self.toggle_btn.grid(row=0, column=0, pady=10)
+        
+        # Files button
+        ttk.Button(self.control_frame, text="📁 Files", 
+                  command=self.show_files_view, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=1, column=0, pady=5)
+        
+        # Database button
+        ttk.Button(self.control_frame, text="💾 Database", 
+                  command=self.show_database_view, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=2, column=0, pady=5)
+    
+    def show_files_view(self):
+        """Show files management view"""
+        self.current_view = "files"
+        self.clear_control_frame()
+        self.control_frame.config(text="System Files")
+        
+        btn_width = 20
+        
+        # Edit Config button
+        ttk.Button(self.control_frame, text="⚙️ Edit Config", 
+                  command=self.edit_config, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=0, column=0, pady=10)
+        
+        # System Info button
+        ttk.Button(self.control_frame, text="📊 System Info", 
+                  command=self.show_system_info, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=1, column=0, pady=5)
+        
+        # Back to Controls button
+        ttk.Button(self.control_frame, text="◀ Controls", 
+                  command=self.show_controls_view, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=2, column=0, pady=5)
+    
+    def show_database_view(self):
+        """Show database management view"""
+        self.current_view = "database"
+        self.clear_control_frame()
+        self.control_frame.config(text="System Database")
+        
+        btn_width = 20
+        
+        # Add Home Owner button
+        ttk.Button(self.control_frame, text="👤 Add New Home Owner", 
+                  command=self.add_user, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=0, column=0, pady=10)
+        
+        # Open Faces Folder button
+        ttk.Button(self.control_frame, text="📁 Open Faces Folder", 
+                  command=self.open_faces_folder, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=1, column=0, pady=5)
+        
+        # Open Strangers Folder button
+        ttk.Button(self.control_frame, text="📸 Open Strangers Folder", 
+                  command=self.open_strangers_folder, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=2, column=0, pady=5)
+        
+        # Back to Controls button
+        ttk.Button(self.control_frame, text="◀ Controls", 
+                  command=self.show_controls_view, 
+                  width=btn_width,
+                  style='Red.TButton').grid(row=3, column=0, pady=5)
     
     def log(self, message):
         """Add message to log with timestamp"""
@@ -180,7 +244,8 @@ class SecuritySystemGUI:
             )
             
             self.is_running = True
-            self.toggle_btn.config(text="⏹ Stop System")
+            if hasattr(self, 'toggle_btn'):
+                self.toggle_btn.config(text="⏹ Stop System")
             self.status_label.config(text="● System Running", fg='#00ff00')
             
             # Start thread to read output
@@ -203,7 +268,8 @@ class SecuritySystemGUI:
             
             # Process ended
             self.is_running = False
-            self.toggle_btn.config(text="▶ Start System")
+            if hasattr(self, 'toggle_btn'):
+                self.toggle_btn.config(text="▶ Start System")
             self.status_label.config(text="● System Stopped", fg='#ff3333')
             self.log("System stopped")
     
@@ -232,7 +298,8 @@ class SecuritySystemGUI:
             self.log(f"ERROR: {e}")
         
         self.is_running = False
-        self.toggle_btn.config(text="▶ Start System")
+        if hasattr(self, 'toggle_btn'):
+            self.toggle_btn.config(text="▶ Start System")
         self.status_label.config(text="● System Stopped", fg='#ff3333')
         self.log("System stopped")
     
