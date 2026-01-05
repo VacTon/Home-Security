@@ -299,11 +299,11 @@ class SecuritySystemGUI:
         else:
             info.append("✗ ArcFace model missing")
         
-        # Check if database exists
-        if os.path.exists('models/known_faces.pkl'):
+        # Check if database exists (correct path)
+        if os.path.exists('faces/encodings.pkl'):
             info.append("✓ Face database found")
         else:
-            info.append("✗ Face database missing (run Process Database)")
+            info.append("✗ Face database missing (run Add New User or Rebuild Database)")
         
         # Count known users
         if os.path.exists('faces'):
