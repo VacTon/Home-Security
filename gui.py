@@ -17,12 +17,44 @@ class SecuritySystemGUI:
         self.main_process = None
         self.is_running = False
         
-        # Configure style
+        # Configure colors - Red theme
+        self.bg_color = "#1a0000"  # Dark red background
+        self.fg_color = "#000000"  # Black text
+        self.accent_color = "#cc0000"  # Bright red
+        self.button_bg = "#ff3333"  # Red button
+        self.button_active = "#ff6666"  # Lighter red on hover
+        self.text_color = "#000000"  # Black text
+        
+        # Configure root background
+        self.root.configure(bg=self.bg_color)
+        
+        # Configure style with red theme
         style = ttk.Style()
         style.theme_use('clam')
         
+        # Configure button style
+        style.configure('Red.TButton',
+                       background=self.button_bg,
+                       foreground=self.text_color,
+                       borderwidth=1,
+                       focuscolor='none',
+                       font=('Arial', 10, 'bold'))
+        style.map('Red.TButton',
+                 background=[('active', self.button_active)])
+        
+        # Configure label frame style
+        style.configure('Red.TLabelframe',
+                       background=self.bg_color,
+                       foreground='#ffffff',
+                       borderwidth=2,
+                       relief='solid')
+        style.configure('Red.TLabelframe.Label',
+                       background=self.bg_color,
+                       foreground='#ffffff',
+                       font=('Arial', 11, 'bold'))
+        
         # Create main container
-        main_frame = ttk.Frame(root, padding="10")
+        main_frame = tk.Frame(root, bg=self.bg_color, padx=10, pady=10)
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights
@@ -32,67 +64,77 @@ class SecuritySystemGUI:
         main_frame.rowconfigure(2, weight=1)
         
         # Title
-        title_label = ttk.Label(main_frame, text="🏠 AI Security System", 
-                               font=('Arial', 20, 'bold'))
-        title_label.grid(row=0, column=0, pady=10)
+        title_label = tk.Label(main_frame, text="🏠 AI Security System", 
+                              font=('Arial', 24, 'bold'),
+                              bg=self.bg_color,
+                              fg='#ffffff')
+        title_label.grid(row=0, column=0, pady=15)
         
         # Control Buttons Frame
-        control_frame = ttk.LabelFrame(main_frame, text="System Controls", padding="10")
+        control_frame = ttk.LabelFrame(main_frame, text="System Controls", 
+                                      padding="15", style='Red.TLabelframe')
         control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=10)
         
-        # Button grid layout
-        btn_width = 20
+        # Button width
+        btn_width = 25
         
-        # Row 1: Main system controls
-        self.start_btn = ttk.Button(control_frame, text="▶ Start System", 
-                                   command=self.start_system, width=btn_width)
-        self.start_btn.grid(row=0, column=0, padx=5, pady=5)
-        
-        self.stop_btn = ttk.Button(control_frame, text="⏹ Stop System", 
-                                  command=self.stop_system, width=btn_width, 
-                                  state='disabled')
-        self.stop_btn.grid(row=0, column=1, padx=5, pady=5)
+        # Row 1: Combined Start/Stop button
+        self.toggle_btn = ttk.Button(control_frame, text="▶ Start System", 
+                                    command=self.toggle_system, 
+                                    width=btn_width,
+                                    style='Red.TButton')
+        self.toggle_btn.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
         
         # Row 2: User management
-        ttk.Button(control_frame, text="👤 Add New User (Auto-Process)", 
-                  command=self.add_user, width=btn_width).grid(row=1, column=0, padx=5, pady=5)
+        ttk.Button(control_frame, text="👤 Add New Home Owner", 
+                  command=self.add_user, width=btn_width,
+                  style='Red.TButton').grid(row=1, column=0, padx=5, pady=5)
         
-        ttk.Button(control_frame, text="🔄 Rebuild Database", 
-                  command=self.process_database, width=btn_width).grid(row=1, column=1, padx=5, pady=5)
+        ttk.Button(control_frame, text="📁 Open Faces Folder", 
+                  command=self.open_faces_folder, width=btn_width,
+                  style='Red.TButton').grid(row=1, column=1, padx=5, pady=5)
         
         # Row 3: Utilities
-        ttk.Button(control_frame, text="📁 Open Faces Folder", 
-                  command=self.open_faces_folder, width=btn_width).grid(row=2, column=0, padx=5, pady=5)
-        
         ttk.Button(control_frame, text="📸 Open Strangers Folder", 
-                  command=self.open_strangers_folder, width=btn_width).grid(row=2, column=1, padx=5, pady=5)
+                  command=self.open_strangers_folder, width=btn_width,
+                  style='Red.TButton').grid(row=2, column=0, padx=5, pady=5)
         
-        # Row 4: Configuration
         ttk.Button(control_frame, text="⚙️ Edit Config", 
-                  command=self.edit_config, width=btn_width).grid(row=3, column=0, padx=5, pady=5)
+                  command=self.edit_config, width=btn_width,
+                  style='Red.TButton').grid(row=2, column=1, padx=5, pady=5)
         
+        # Row 4: Info
         ttk.Button(control_frame, text="📊 System Info", 
-                  command=self.show_system_info, width=btn_width).grid(row=3, column=1, padx=5, pady=5)
+                  command=self.show_system_info, width=btn_width,
+                  style='Red.TButton').grid(row=3, column=0, columnspan=2, padx=5, pady=5)
         
         # Status Frame
-        status_frame = ttk.LabelFrame(main_frame, text="System Status", padding="10")
+        status_frame = ttk.LabelFrame(main_frame, text="System Status", 
+                                     padding="15", style='Red.TLabelframe')
         status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
         status_frame.columnconfigure(0, weight=1)
-        status_frame.rowconfigure(0, weight=1)
+        status_frame.rowconfigure(1, weight=1)
         
         # Status indicator
-        self.status_label = ttk.Label(status_frame, text="● System Stopped", 
-                                     font=('Arial', 12), foreground='red')
+        self.status_label = tk.Label(status_frame, text="● System Stopped", 
+                                    font=('Arial', 12, 'bold'),
+                                    bg=self.bg_color,
+                                    fg='#ff3333')
         self.status_label.grid(row=0, column=0, sticky=tk.W, pady=5)
         
         # Log output
         self.log_text = scrolledtext.ScrolledText(status_frame, height=15, 
-                                                  wrap=tk.WORD, font=('Courier', 9))
+                                                  wrap=tk.WORD, 
+                                                  font=('Courier', 9),
+                                                  bg='#ffffff',
+                                                  fg='#000000')
         self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Clear log button
-        ttk.Button(status_frame, text="Clear Log", 
-                  command=self.clear_log).grid(row=2, column=0, pady=5)
+        clear_btn = ttk.Button(status_frame, text="Clear Log", 
+                              command=self.clear_log,
+                              style='Red.TButton')
+        clear_btn.grid(row=2, column=0, pady=5)
         
         # Initial log message
         self.log("Security System Control Panel initialized")
@@ -113,10 +155,16 @@ class SecuritySystemGUI:
         """Clear the log text"""
         self.log_text.delete(1.0, tk.END)
     
+    def toggle_system(self):
+        """Toggle system on/off"""
+        if self.is_running:
+            self.stop_system()
+        else:
+            self.start_system()
+    
     def start_system(self):
         """Start the main security system"""
         if self.is_running:
-            messagebox.showwarning("Already Running", "System is already running!")
             return
         
         self.log("Starting security system...")
@@ -132,9 +180,8 @@ class SecuritySystemGUI:
             )
             
             self.is_running = True
-            self.start_btn.config(state='disabled')
-            self.stop_btn.config(state='normal')
-            self.status_label.config(text="● System Running", foreground='green')
+            self.toggle_btn.config(text="⏹ Stop System")
+            self.status_label.config(text="● System Running", fg='#00ff00')
             
             # Start thread to read output
             threading.Thread(target=self.read_process_output, daemon=True).start()
@@ -156,9 +203,8 @@ class SecuritySystemGUI:
             
             # Process ended
             self.is_running = False
-            self.start_btn.config(state='normal')
-            self.stop_btn.config(state='disabled')
-            self.status_label.config(text="● System Stopped", foreground='red')
+            self.toggle_btn.config(text="▶ Start System")
+            self.status_label.config(text="● System Stopped", fg='#ff3333')
             self.log("System stopped")
     
     def stop_system(self):
@@ -186,14 +232,13 @@ class SecuritySystemGUI:
             self.log(f"ERROR: {e}")
         
         self.is_running = False
-        self.start_btn.config(state='normal')
-        self.stop_btn.config(state='disabled')
-        self.status_label.config(text="● System Stopped", foreground='red')
+        self.toggle_btn.config(text="▶ Start System")
+        self.status_label.config(text="● System Stopped", fg='#ff3333')
         self.log("System stopped")
     
     def add_user(self):
         """Run add_user.py tool"""
-        self.log("Launching Add User tool...")
+        self.log("Launching Add Home Owner tool...")
         
         try:
             # Run in new terminal window
@@ -203,41 +248,11 @@ class SecuritySystemGUI:
             else:  # Linux/Mac
                 subprocess.Popen(['x-terminal-emulator', '-e', 'python3', 'tools/add_user.py'])
             
-            self.log("Add User tool opened in new window")
+            self.log("Add Home Owner tool opened in new window")
             
         except Exception as e:
             self.log(f"ERROR: {e}")
-            messagebox.showerror("Error", f"Failed to launch Add User:\n{e}")
-    
-    def process_database(self):
-        """Run process_database.py"""
-        self.log("Processing face database...")
-        
-        def run_process():
-            try:
-                result = subprocess.run(
-                    [sys.executable, 'tools/process_database.py'],
-                    capture_output=True,
-                    text=True
-                )
-                
-                self.log("--- Database Processing Output ---")
-                self.log(result.stdout)
-                if result.stderr:
-                    self.log(f"ERRORS:\n{result.stderr}")
-                self.log("--- Processing Complete ---")
-                
-                if result.returncode == 0:
-                    messagebox.showinfo("Success", "Database processed successfully!")
-                else:
-                    messagebox.showerror("Error", "Database processing failed. Check log.")
-                    
-            except Exception as e:
-                self.log(f"ERROR: {e}")
-                messagebox.showerror("Error", f"Failed to process database:\n{e}")
-        
-        # Run in background thread
-        threading.Thread(target=run_process, daemon=True).start()
+            messagebox.showerror("Error", f"Failed to launch Add Home Owner:\n{e}")
     
     def open_faces_folder(self):
         """Open faces directory in file explorer"""
@@ -303,14 +318,14 @@ class SecuritySystemGUI:
         if os.path.exists('faces/encodings.pkl'):
             info.append("✓ Face database found")
         else:
-            info.append("✗ Face database missing (run Add New User or Rebuild Database)")
+            info.append("✗ Face database missing (run Add New Home Owner)")
         
         # Count known users
         if os.path.exists('faces'):
             users = [d for d in os.listdir('faces') if os.path.isdir(os.path.join('faces', d))]
-            info.append(f"👤 Known users: {len(users)}")
+            info.append(f"👤 Known home owners: {len(users)}")
         else:
-            info.append("👤 Known users: 0")
+            info.append("👤 Known home owners: 0")
         
         # Count stranger photos
         if os.path.exists('strangers'):
